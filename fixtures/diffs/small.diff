@@ -1,0 +1,17 @@
+diff --git a/src/lib/rate-limit.ts b/src/lib/rate-limit.ts
+index f06d5b4..170647b 100644
+--- a/src/lib/rate-limit.ts
++++ b/src/lib/rate-limit.ts
+@@ -8,7 +8,11 @@ const hits = new Map<string, number[]>();
+ export function isAllowed(key: string, options: RateLimitOptions): boolean {
+   const now = Date.now();
+   const recent = (hits.get(key) ?? []).filter((time) => now - time < options.windowMs);
++  if (recent.length >= options.limit) {
++    hits.set(key, recent);
++    return false;
++  }
+   recent.push(now);
+   hits.set(key, recent);
+-  return recent.length <= options.limit;
++  return true;
+ }

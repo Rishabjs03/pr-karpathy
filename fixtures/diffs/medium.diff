@@ -1,0 +1,83 @@
+diff --git a/src/api/server.ts b/src/api/server.ts
+index b0b9f1a..15575ba 100644
+--- a/src/api/server.ts
++++ b/src/api/server.ts
+@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
+ import { isAllowed } from '../lib/rate-limit';
+ import { handleUpload } from './upload';
+ 
+-const LIMIT = { limit: 100, windowMs: 60_000 };
++const LIMIT = { limit: 20, windowMs: 60_000 };
+ 
+ export const server = createServer((request, response) => {
+   const key = request.socket.remoteAddress ?? 'unknown';
+@@ -12,7 +12,10 @@ export const server = createServer((request, response) => {
+     return;
+   }
+   if (request.url === '/upload' && request.method === 'POST') {
+-    handleUpload(request, response);
++    handleUpload(request, response).catch(() => {
++      response.statusCode = 500;
++      response.end('Upload failed');
++    });
+     return;
+   }
+   response.statusCode = 404;
+diff --git a/src/api/upload.ts b/src/api/upload.ts
+index b930767..86fc12c 100644
+--- a/src/api/upload.ts
++++ b/src/api/upload.ts
+@@ -1,14 +1,47 @@
+ import type { IncomingMessage, ServerResponse } from 'node:http';
+-import { writeFile } from 'node:fs/promises';
++import { createWriteStream } from 'node:fs';
++import { mkdir } from 'node:fs/promises';
+ import path from 'node:path';
++import { pipeline } from 'node:stream/promises';
++import { Transform } from 'node:stream';
+ 
+-const UPLOAD_DIR = '/var/data/uploads';
++const UPLOAD_DIR = process.env.UPLOAD_DIR ?? '/var/data/uploads';
++const MAX_BYTES = 10 * 1024 * 1024;
++const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'application/pdf']);
++
++/** Removes directory parts so a client cannot write outside UPLOAD_DIR. */
++export function safeFileName(raw: string): string {
++  const base = path.basename(raw).replace(/[^A-Za-z0-9._-]/g, '_');
++  return base.length > 0 ? base : 'upload.bin';
++}
++
++function limitSize(maxBytes: number): Transform {
++  let seen = 0;
++  return new Transform({
++    transform(chunk: Buffer, _encoding, callback) {
++      seen += chunk.length;
++      if (seen > maxBytes) callback(new Error('too large'));
++      else callback(null, chunk);
++    },
++  });
++}
+ 
+ export async function handleUpload(request: IncomingMessage, response: ServerResponse) {
+-  const name = String(request.headers['x-file-name'] ?? 'upload.bin');
+-  const chunks: Buffer[] = [];
+-  for await (const chunk of request) chunks.push(chunk as Buffer);
+-  await writeFile(path.join(UPLOAD_DIR, name), Buffer.concat(chunks));
++  const type = String(request.headers['content-type'] ?? '');
++  if (!ALLOWED_TYPES.has(type)) {
++    response.statusCode = 415;
++    response.end('Unsupported type');
++    return;
++  }
++  const name = safeFileName(String(request.headers['x-file-name'] ?? 'upload.bin'));
++  await mkdir(UPLOAD_DIR, { recursive: true });
++  try {
++    await pipeline(request, limitSize(MAX_BYTES), createWriteStream(path.join(UPLOAD_DIR, name)));
++  } catch {
++    response.statusCode = 413;
++    response.end('Too large');
++    return;
++  }
+   response.statusCode = 201;
+   response.end('Stored');
+ }

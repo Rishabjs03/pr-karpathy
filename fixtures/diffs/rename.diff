@@ -1,0 +1,20 @@
+diff --git a/docs/README.md b/docs/index.md
+similarity index 100%
+rename from docs/README.md
+rename to docs/index.md
+diff --git a/src/lib/config.ts b/src/config/load.ts
+similarity index 79%
+rename from src/lib/config.ts
+rename to src/config/load.ts
+index 7552c01..14ad96d 100644
+--- a/src/lib/config.ts
++++ b/src/config/load.ts
+@@ -5,7 +5,7 @@ export interface Config {
+ 
+ export function loadConfig(env: NodeJS.ProcessEnv): Config {
+   return {
+-    port: Number(env.PORT ?? 3000),
++    port: Number.parseInt(env.PORT ?? '3000', 10),
+     uploadDir: env.UPLOAD_DIR ?? '/var/data/uploads',
+   };
+ }

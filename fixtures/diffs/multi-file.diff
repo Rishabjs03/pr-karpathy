@@ -1,0 +1,65 @@
+diff --git a/docs/README.md b/docs/README.md
+index 816d89c..918e495 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -1,3 +1,5 @@
+ # Service
+ 
+ Run `npm start`.
++
++Metrics are served at `/metrics`.
+diff --git a/docs/logo.png b/docs/logo.png
+index 029ace0..d186a24 100644
+Binary files a/docs/logo.png and b/docs/logo.png differ
+diff --git a/src/api/server.ts b/src/api/server.ts
+index b0b9f1a..c2f6451 100644
+--- a/src/api/server.ts
++++ b/src/api/server.ts
+@@ -1,12 +1,20 @@
+ import { createServer } from 'node:http';
+ import { isAllowed } from '../lib/rate-limit';
+ import { handleUpload } from './upload';
++import { increment, snapshot } from '../lib/metrics';
+ 
+ const LIMIT = { limit: 100, windowMs: 60_000 };
+ 
+ export const server = createServer((request, response) => {
+   const key = request.socket.remoteAddress ?? 'unknown';
++  increment('requests');
++  if (request.url === '/metrics') {
++    response.setHeader('content-type', 'application/json');
++    response.end(JSON.stringify(snapshot()));
++    return;
++  }
+   if (!isAllowed(key, LIMIT)) {
++    increment('rate_limited');
+     response.statusCode = 429;
+     response.end('Too many requests');
+     return;
+diff --git a/src/lib/legacy-format.ts b/src/lib/legacy-format.ts
+deleted file mode 100644
+index dec091d..0000000
+--- a/src/lib/legacy-format.ts
++++ /dev/null
+@@ -1,6 +0,0 @@
+-/** @deprecated Use Intl.NumberFormat instead. */
+-export function formatBytes(bytes: number): string {
+-  if (bytes < 1024) return `${bytes} B`;
+-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+-}
+diff --git a/src/lib/metrics.ts b/src/lib/metrics.ts
+new file mode 100644
+index 0000000..7d32914
+--- /dev/null
++++ b/src/lib/metrics.ts
+@@ -0,0 +1,9 @@
++const counters = new Map<string, number>();
++
++export function increment(name: string, by = 1): void {
++  counters.set(name, (counters.get(name) ?? 0) + by);
++}
++
++export function snapshot(): Record<string, number> {
++  return Object.fromEntries(counters);
++}

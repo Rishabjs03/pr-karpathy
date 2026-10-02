@@ -9,7 +9,7 @@
   },
   "exports": {
     ".": {
-      "source": "./src/index.ts",
+      "@lucidiff/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
@@ -39,6 +39,7 @@
   "dependencies": {
     "@lucidiff/core": "workspace:*",
     "@lucidiff/renderer": "workspace:*",
+    "ai": "^7.0.127",
     "commander": "^15.0.0",
     "picocolors": "^1.1.1"
   }

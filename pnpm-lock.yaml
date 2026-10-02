@@ -50,6 +50,9 @@ importers:
       typescript-eslint:
         specifier: ^8.71.0
         version: 8.71.0(eslint@10.11.0)(typescript@6.0.3)
+      vite:
+        specifier: ^8.3.2
+        version: 8.3.2(@types/node@22.20.5)(esbuild@0.27.7)(yaml@2.9.1)
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@22.20.5)(vite@8.3.2(@types/node@22.20.5)(esbuild@0.27.7)(yaml@2.9.1))
@@ -62,6 +65,9 @@ importers:
       '@lucidiff/renderer':
         specifier: workspace:*
         version: link:../renderer
+      ai:
+        specifier: ^7.0.127
+        version: 7.0.127(zod@4.6.5)
       commander:
         specifier: ^15.0.0
         version: 15.0.0
