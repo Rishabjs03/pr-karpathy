@@ -23,7 +23,10 @@ function column(value: number | null): string {
 export function describeFile(file: DiffFile): string {
   const kind = file.kind === 'renamed' ? `renamed from ${file.oldPath}` : file.kind;
   const binary = file.binary ? ', binary' : '';
-  return `${file.path} (${kind}${binary}, +${file.additions} -${file.deletions})`;
+  const part = file.part
+    ? `, part ${file.part.index} of ${file.part.total}; the other hunks are in other batches`
+    : '';
+  return `${file.path} (${kind}${binary}, +${file.additions} -${file.deletions}${part})`;
 }
 
 /** Formats one file's diff with line numbers. */

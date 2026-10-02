@@ -233,7 +233,10 @@ export async function explain(
   emit({
     stage: 'analyze',
     type: 'start',
-    message: `Analyzing with ${choice.modelId}${plan.mode === 'batched' ? ` in ${plan.batches.length} batches` : ''}`,
+    message:
+      plan.mode === 'batched'
+        ? `Analyzing with ${choice.modelId} in ${plan.batches.length} batches (~${Math.round(plan.estimatedTokens / 1000)}k input tokens)`
+        : `Analyzing with ${choice.modelId}`,
   });
   const draft =
     plan.mode === 'single'

@@ -4,7 +4,7 @@
  * The model writes `what` and `why`. The diff supplies the change kind, line counts, and
  * rename source, so those can never be wrong. Every analyzed file appears exactly once: files
  * the model skipped get `what: null`, and entries for files that are not in the diff are
- * dropped.
+ * dropped. When a large file was split into parts (batched mode), the parts' texts are joined.
  */
 import type { DiffFile } from '../diff/types';
 import type { DocumentChange } from '../schema/document';
@@ -16,6 +16,14 @@ export interface ChangesResult {
   changes: DocumentChange[];
   /** Paths the model described that are not in the diff. */
   unknownFiles: string[];
+}
+
+function joinDistinct(first: string, second: string): string {
+  const a = first.trim();
+  const b = second.trim();
+  if (!a || a === b) return b || a;
+  if (!b) return a;
+  return `${a} ${b}`;
 }
 
 function toDocumentChange(file: DiffFile, change: LlmChange | null): DocumentChange {
@@ -45,7 +53,15 @@ export function mergeChanges(llmChanges: readonly LlmChange[], index: FileIndex)
       unknownFiles.push(change.file);
       continue;
     }
-    if (described.has(file)) continue; // Keep the first entry for a file.
+    const previous = described.get(file);
+    if (previous) {
+      described.set(file, {
+        file: previous.file,
+        what: joinDistinct(previous.what, change.what),
+        why: joinDistinct(previous.why, change.why),
+      });
+      continue;
+    }
     described.set(file, change);
     order.push(file);
   }

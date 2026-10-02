@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BUDGET, planAnalysis } from '../src/analyze/plan';
+import { DEFAULT_BUDGET, planAnalysis, splitFileByHunks } from '../src/analyze/plan';
+import { describeFile, estimateTokens, formatFileDiff } from '../src/diff/format';
 import type { PreparedChangeSet } from '../src/changeset';
 import { parseUnifiedDiff } from '../src/diff/parse';
 import { fixtureDiff } from './helpers';
@@ -107,3 +108,35 @@ describe('planAnalysis', () => {
     expect(plan.tooLarge.map((file) => file.path)).toContain('src/api/upload.ts');
   });
 });
+
+describe('splitFileByHunks', () => {
+  const file = parseUnifiedDiff(fixtureDiff('medium.diff')).find(
+    (f) => f.path === 'src/api/server.ts',
+  )!;
+
+  it('splits a file into parts of whole hunks with their own line counts', () => {
+    const parts = splitFileByHunks(file, diffTokensOfOneHunk(file) + 5)!;
+    expect(parts).toHaveLength(2);
+    expect(parts.map((part) => part.part)).toEqual([
+      { index: 1, total: 2 },
+      { index: 2, total: 2 },
+    ]);
+    expect(parts.reduce((sum, part) => sum + part.additions, 0)).toBe(file.additions);
+    expect(parts.flatMap((part) => part.hunks)).toEqual(file.hunks);
+  });
+
+  it('returns null when a single hunk is larger than the budget', () => {
+    expect(splitFileByHunks(file, 10)).toBeNull();
+  });
+
+  it('tells the model that a part is a part', () => {
+    const [first] = splitFileByHunks(file, diffTokensOfOneHunk(file) + 5)!;
+    expect(describeFile(first!)).toContain('part 1 of 2');
+  });
+});
+
+function diffTokensOfOneHunk(file: ReturnType<typeof parseUnifiedDiff>[number]): number {
+  return Math.max(
+    ...file.hunks.map((hunk) => estimateTokens(formatFileDiff({ ...file, hunks: [hunk] })) + 30),
+  );
+}

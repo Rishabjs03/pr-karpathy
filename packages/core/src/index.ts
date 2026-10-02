@@ -55,6 +55,7 @@ export {
 export {
   DEFAULT_BUDGET,
   planAnalysis,
+  splitFileByHunks,
   type AnalysisPlan,
   type BudgetOptions,
 } from './analyze/plan';

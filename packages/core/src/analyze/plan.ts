@@ -5,11 +5,13 @@
  *   context while the budget allows (the new version of the most-changed files first).
  * - If it does not fit, split the files into batches (map-reduce, see `./batched.ts`). Each
  *   batch gets its own context budget.
- * - A single file whose diff alone exceeds the batch budget is skipped as "too-large".
+ * - A file whose diff alone exceeds the batch budget is split into parts by whole hunks, and
+ *   the parts go to different batches. Only a single hunk that is larger than the budget
+ *   (usually a generated or data file) makes the file "too-large".
  */
 import type { FileContents, PreparedChangeSet } from '../changeset';
 import { estimateTokens, formatFileContent, formatFileDiff } from '../diff/format';
-import type { DiffFile } from '../diff/types';
+import type { DiffFile, DiffHunk } from '../diff/types';
 import { buildUserPrompt } from '../prompts/user-message';
 
 export interface BudgetOptions {
@@ -82,6 +84,46 @@ function selectContents(
   return used;
 }
 
+const FILE_OVERHEAD = 30;
+
+function diffTokens(file: DiffFile): number {
+  return estimateTokens(formatFileDiff(file)) + FILE_OVERHEAD;
+}
+
+function countLines(hunks: readonly DiffHunk[]): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of hunks.flatMap((hunk) => hunk.lines)) {
+    if (line.type === 'add') additions += 1;
+    else if (line.type === 'delete') deletions += 1;
+  }
+  return { additions, deletions };
+}
+
+/**
+ * Splits a file's diff into parts of whole hunks that each fit in `budget` tokens.
+ * Returns null when one hunk alone is larger than the budget.
+ */
+export function splitFileByHunks(file: DiffFile, budget: number): DiffFile[] | null {
+  const groups: DiffHunk[][] = [];
+  let group: DiffHunk[] = [];
+  for (const hunk of file.hunks) {
+    if (diffTokens({ ...file, hunks: [hunk] }) > budget) return null;
+    if (group.length > 0 && diffTokens({ ...file, hunks: [...group, hunk] }) > budget) {
+      groups.push(group);
+      group = [];
+    }
+    group.push(hunk);
+  }
+  if (group.length > 0) groups.push(group);
+  return groups.map((hunks, index) => ({
+    ...file,
+    hunks,
+    ...countLines(hunks),
+    part: { index: index + 1, total: groups.length },
+  }));
+}
+
 /**
  * Decides between one call and batched calls, and which file contents to include.
  *
@@ -138,12 +180,7 @@ export function planAnalysis(
   const tooLarge: DiffFile[] = [];
   let current: DiffFile[] = [];
   let currentTokens = 0;
-  for (const file of prepared.files) {
-    const tokens = estimateTokens(formatFileDiff(file)) + 30;
-    if (tokens > diffBudget) {
-      tooLarge.push(file);
-      continue;
-    }
+  const add = (file: DiffFile, tokens: number) => {
     if (currentTokens + tokens > diffBudget && current.length > 0) {
       batches.push({ files: current, contents: new Map() });
       current = [];
@@ -151,23 +188,33 @@ export function planAnalysis(
     }
     current.push(file);
     currentTokens += tokens;
+  };
+  for (const file of prepared.files) {
+    const tokens = diffTokens(file);
+    if (tokens <= diffBudget) {
+      add(file, tokens);
+      continue;
+    }
+    const parts = splitFileByHunks(file, diffBudget);
+    if (!parts) {
+      tooLarge.push(file);
+      continue;
+    }
+    for (const part of parts) add(part, diffTokens(part));
   }
   if (current.length > 0) batches.push({ files: current, contents: new Map() });
 
   let estimatedTokens = 0;
   for (const batch of batches) {
-    const diffTokens = batch.files.reduce(
-      (sum, file) => sum + estimateTokens(formatFileDiff(file)) + 30,
-      0,
-    );
-    const used = selectContents(
+    const used = batch.files.reduce((sum, file) => sum + diffTokens(file), 0);
+    const context = selectContents(
       batch.files,
       prepared.contents,
-      diffBudget - diffTokens,
+      diffBudget - used,
       options,
       batch.contents,
     );
-    estimatedTokens += overhead + diffTokens + used;
+    estimatedTokens += overhead + used + context;
   }
   return { mode: 'batched', batches, estimatedTokens, tooLarge };
 }

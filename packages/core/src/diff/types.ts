@@ -32,4 +32,9 @@ export interface DiffFile {
   hunks: DiffHunk[];
   additions: number;
   deletions: number;
+  /**
+   * Set when a large file was split into parts for batched analysis: this object holds only
+   * some of the file's hunks, and `additions` and `deletions` count only those hunks.
+   */
+  part?: { index: number; total: number };
 }

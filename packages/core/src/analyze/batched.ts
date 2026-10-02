@@ -10,6 +10,7 @@ import {
   OverviewSchema,
   type BatchAnalysis,
   type Explanation,
+  type LlmChange,
 } from '../schema/llm';
 import { callModel, mapWithConcurrency, type AnalysisContext } from './context';
 import type { Batch } from './plan';
@@ -27,14 +28,14 @@ export async function analyzeBatched(
     batches,
     context.concurrency,
     async (batch): Promise<BatchAnalysis> => {
-      const inBatch = new Set(batch.files);
+      const inBatch = new Set(batch.files.map((file) => file.path));
       const prompt = buildUserPrompt({
         source: prepared.source,
         pr: prepared.pr,
         files: batch.files,
         skipped: prepared.skipped,
         contents: batch.contents,
-        otherFiles: prepared.files.filter((file) => !inBatch.has(file)),
+        otherFiles: prepared.files.filter((file) => !inBatch.has(file.path)),
       });
       const result = await callModel(context, {
         schema: BatchAnalysisSchema,
@@ -48,7 +49,22 @@ export async function analyzeBatched(
     },
   );
 
-  const changes = results.flatMap((result) => result.changes);
+  // Parts of a split file come back as separate entries; join them per file.
+  const byFile = new Map<string, LlmChange>();
+  for (const change of results.flatMap((result) => result.changes)) {
+    const previous = byFile.get(change.file);
+    byFile.set(
+      change.file,
+      previous
+        ? {
+            file: change.file,
+            what: `${previous.what} ${change.what}`,
+            why: `${previous.why} ${change.why}`,
+          }
+        : change,
+    );
+  }
+  const changes = [...byFile.values()];
   const risks = results.flatMap((result) => result.risks);
   const testIdeas = results.flatMap((result) => result.test_ideas);
 
