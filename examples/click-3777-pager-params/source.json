@@ -1,0 +1,14 @@
+{
+  "url": "https://github.com/pallets/click/pull/3777",
+  "repository": "pallets/click",
+  "number": 3777,
+  "title": "Forward all user's parameters set in `PAGER` and improve flag detection",
+  "description": null,
+  "base_ref": "main",
+  "head_ref": null,
+  "author": null,
+  "commit": "a6256bfb5971d5e58585fe7b6c656134e1ade5a4",
+  "license": "BSD-3-Clause",
+  "model": "claude-opus-5-5",
+  "generated_at": "2026-10-02T20:00:00.000Z"
+}

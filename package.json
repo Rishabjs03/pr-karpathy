@@ -19,7 +19,7 @@
     "test:update": "vitest run -u",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
     "sample": "pnpm --filter @lucidiff/core --filter @lucidiff/renderer build && node scripts/render-sample.mjs",
-    "examples": "node --experimental-strip-types scripts/generate-examples.ts",
+    "examples": "pnpm build && node scripts/generate-examples.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"
@@ -30,6 +30,7 @@
     "@lucidiff/core": "workspace:*",
     "@lucidiff/renderer": "workspace:*",
     "@types/node": "^22.20.5",
+    "ai": "^7.0.127",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",

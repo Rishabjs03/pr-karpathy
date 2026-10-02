@@ -56,7 +56,7 @@ describe('renderHtml', () => {
     const doc = sampleDocument();
     doc.summary = 'Calls `parse<T>()` and **not bold**.';
     const body = renderBody(doc).value;
-    expect(body).toContain('<code>parse&lt;T&gt;()</code>');
+    expect(body).toContain('<code class="nowrap">parse&lt;T&gt;()</code>');
     expect(body).toContain('**not bold**');
   });
 

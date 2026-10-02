@@ -13,6 +13,7 @@ import { risksSection } from './components/risks';
 import { summarySection } from './components/summary';
 import { testsSection } from './components/tests';
 import { html, jsonForScript, type SafeHtml } from './html';
+import { plainText } from './text';
 import { type MermaidAsset } from './mermaid-bundle';
 
 export interface RenderOptions {
@@ -62,8 +63,8 @@ export function renderHtml(document: unknown, options: RenderOptions = {}): stri
     mermaid: doc.flow.nodes.length > 0 ? doc.flow.mermaid : null,
   };
   return layout({
-    title: `${doc.title} · ${doc.meta.tool.name}`,
-    description: doc.summary.split(/\n\s*\n/)[0]?.slice(0, 200) ?? doc.title,
+    title: `${plainText(doc.title)} · ${doc.meta.tool.name}`,
+    description: plainText(doc.summary.split(/\n\s*\n/)[0] ?? doc.title).slice(0, 200),
     styles,
     themeScript,
     clientScript,

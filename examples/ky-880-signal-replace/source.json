@@ -1,0 +1,14 @@
+{
+  "url": "https://github.com/sindresorhus/ky/pull/880",
+  "repository": "sindresorhus/ky",
+  "number": 880,
+  "title": "Fix `signal` replacement when extending instances",
+  "description": null,
+  "base_ref": "main",
+  "head_ref": null,
+  "author": null,
+  "commit": "0bda554d448c1b57c17a5c18114432c02465d467",
+  "license": "MIT",
+  "model": "claude-opus-5-5",
+  "generated_at": "2026-10-02T20:00:00.000Z"
+}

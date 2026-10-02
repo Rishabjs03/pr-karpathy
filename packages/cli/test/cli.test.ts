@@ -5,6 +5,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { run, type CliIO } from '../src';
+import { MockLanguageModelV4 } from 'ai/test';
 import { fixtureDiff, mockModel } from '../../core/test/helpers';
 
 const explanation = {
@@ -195,6 +196,21 @@ describe('lucidiff CLI', () => {
   it('rejects git ranges that look like options', async () => {
     const h = harness(dir);
     expect(await run(['--git', '--output=/etc/passwd'], h.io)).not.toBe(0);
+  });
+
+  it('marks only the failed stage when the model call fails', async () => {
+    await writeFile(path.join(dir, 'change.diff'), fixtureDiff('small.diff'));
+    const h = harness(dir);
+    h.io.languageModel = new MockLanguageModelV4({
+      doStream: async () => {
+        throw new Error('provider unavailable');
+      },
+    });
+    expect(await run(['change.diff'], h.io)).toBe(1);
+    expect(h.stderr()).toContain('✔ Loading changes');
+    expect(h.stderr()).toContain('✖ Analyzing with');
+    expect(h.stderr()).not.toContain('✖ Loading changes');
+    expect(h.stderr()).toContain('provider unavailable');
   });
 
   it('explains what to do when there is no input', async () => {

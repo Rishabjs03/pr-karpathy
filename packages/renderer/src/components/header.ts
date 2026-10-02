@@ -2,7 +2,7 @@ import type { ExplainerDocument } from '@lucidiff/core/schema';
 import { html, type SafeHtml } from '../html';
 import { icons } from '../icons';
 import { normalizePrUrl } from '../links';
-import { formatNumber, plural } from '../text';
+import { formatNumber, inline, plural } from '../text';
 
 interface NavItem {
   id: string;
@@ -75,7 +75,7 @@ export function hero(doc: ExplainerDocument): SafeHtml {
   const author = source.author ? html`<span>by ${source.author}</span>` : '';
   return html`<header class="hero" id="top">
     <p class="eyebrow">${sourceLine(doc)}</p>
-    <h1>${doc.title}</h1>
+    <h1>${inline(doc.title)}</h1>
     <div class="hero-meta">
       ${refs}
       <span>${plural(stats.files_changed, 'file')} changed</span>

@@ -1,0 +1,2499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;sha256-G3Y8W3yR7qO0Df2oHUgzTju4T2B7S47RLHZ7OHNzpRo=&#39; &#39;sha256-6hPih1DKiVf1uoatEi1z78uH0BaSRHPhWI7gmH3eAzc=&#39; https://cdn.jsdelivr.net; style-src &#39;unsafe-inline&#39;; img-src data:; font-src data:; base-uri &#39;none&#39;; form-action &#39;none&#39;" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Failed fetch calls now reject with a new NetworkError instead of the runtime&#39;s raw TypeError. #fetch wraps the error only when isRawNetworkError recognizes its message, and keeps the original error in" />
+    <meta name="generator" content="lucidiff" />
+    <title>Wrap fetch network failures in NetworkError and stop retrying unknown errors · lucidiff</title>
+    <script>// Runs in <head> before first paint, so a saved theme choice never flashes the other theme.
+(function () {
+  try {
+    var saved = localStorage.getItem('lucidiff:theme');
+    if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+  } catch {
+    // Storage can be unavailable (private mode, file:// restrictions). Follow the system theme.
+  }
+})();
+</script> <style>/*
+ * lucidiff explainer page styles.
+ *
+ * All colors are tokens on :root. Dark mode redefines the tokens, either from the system
+ * preference or from an explicit [data-theme] choice saved by the theme toggle.
+ * Text tokens meet WCAG AA contrast on their backgrounds in both themes.
+ */
+
+:root {
+  color-scheme: light;
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-hover: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-subtle: #6b6b74;
+  --code-bg: #f1f1f3;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef2ff;
+  --focus: #6366f1;
+  --shadow: 0 1px 2px rgb(24 24 27 / 0.04), 0 1px 3px rgb(24 24 27 / 0.06);
+  --topbar-bg: rgb(250 250 250 / 0.82);
+
+  --add: #15803d;
+  --del: #b91c1c;
+
+  --kind-added: #15803d;
+  --kind-added-bg: #f0fdf4;
+  --kind-modified: #4338ca;
+  --kind-modified-bg: #eef2ff;
+  --kind-deleted: #b91c1c;
+  --kind-deleted-bg: #fef2f2;
+  --kind-renamed: #7e22ce;
+  --kind-renamed-bg: #faf5ff;
+
+  --high: #b91c1c;
+  --high-bg: #fef2f2;
+  --high-border: #fecaca;
+  --high-bar: #dc2626;
+  --medium: #a14a06;
+  --medium-bg: #fffbeb;
+  --medium-border: #fde68a;
+  --medium-bar: #d97706;
+  --low: #1d4ed8;
+  --low-bg: #eff6ff;
+  --low-border: #bfdbfe;
+  --low-bar: #3b82f6;
+
+  --flow-node-fill: #ffffff;
+  --flow-node-stroke: #a1a1aa;
+  --flow-changed-fill: #eef2ff;
+  --flow-changed-stroke: #6366f1;
+  --flow-cluster-fill: #f8f8f9;
+  --flow-line: #9a9aa3;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gutter: 24px;
+  --topbar-height: 52px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #09090b;
+    --surface: #111113;
+    --surface-raised: #18181b;
+    --surface-hover: #1c1c20;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --text: #ececef;
+    --text-muted: #a8a8b0;
+    --text-subtle: #8f8f99;
+    --code-bg: #1f1f23;
+    --accent: #a5b4fc;
+    --accent-hover: #c7d2fe;
+    --accent-soft: rgb(99 102 241 / 0.16);
+    --focus: #818cf8;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --topbar-bg: rgb(9 9 11 / 0.8);
+
+    --add: #4ade80;
+    --del: #f87171;
+
+    --kind-added: #4ade80;
+    --kind-added-bg: rgb(34 197 94 / 0.12);
+    --kind-modified: #a5b4fc;
+    --kind-modified-bg: rgb(99 102 241 / 0.16);
+    --kind-deleted: #f87171;
+    --kind-deleted-bg: rgb(239 68 68 / 0.12);
+    --kind-renamed: #d8b4fe;
+    --kind-renamed-bg: rgb(168 85 247 / 0.14);
+
+    --high: #fca5a5;
+    --high-bg: rgb(239 68 68 / 0.1);
+    --high-border: rgb(239 68 68 / 0.35);
+    --high-bar: #ef4444;
+    --medium: #fcd34d;
+    --medium-bg: rgb(245 158 11 / 0.1);
+    --medium-border: rgb(245 158 11 / 0.35);
+    --medium-bar: #f59e0b;
+    --low: #93c5fd;
+    --low-bg: rgb(59 130 246 / 0.1);
+    --low-border: rgb(59 130 246 / 0.35);
+    --low-bar: #3b82f6;
+
+    --flow-node-fill: #18181b;
+    --flow-node-stroke: #52525b;
+    --flow-changed-fill: #1e1b4b;
+    --flow-changed-stroke: #818cf8;
+    --flow-cluster-fill: #141417;
+    --flow-line: #71717a;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #09090b;
+  --surface: #111113;
+  --surface-raised: #18181b;
+  --surface-hover: #1c1c20;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text: #ececef;
+  --text-muted: #a8a8b0;
+  --text-subtle: #8f8f99;
+  --code-bg: #1f1f23;
+  --accent: #a5b4fc;
+  --accent-hover: #c7d2fe;
+  --accent-soft: rgb(99 102 241 / 0.16);
+  --focus: #818cf8;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --topbar-bg: rgb(9 9 11 / 0.8);
+
+  --add: #4ade80;
+  --del: #f87171;
+
+  --kind-added: #4ade80;
+  --kind-added-bg: rgb(34 197 94 / 0.12);
+  --kind-modified: #a5b4fc;
+  --kind-modified-bg: rgb(99 102 241 / 0.16);
+  --kind-deleted: #f87171;
+  --kind-deleted-bg: rgb(239 68 68 / 0.12);
+  --kind-renamed: #d8b4fe;
+  --kind-renamed-bg: rgb(168 85 247 / 0.14);
+
+  --high: #fca5a5;
+  --high-bg: rgb(239 68 68 / 0.1);
+  --high-border: rgb(239 68 68 / 0.35);
+  --high-bar: #ef4444;
+  --medium: #fcd34d;
+  --medium-bg: rgb(245 158 11 / 0.1);
+  --medium-border: rgb(245 158 11 / 0.35);
+  --medium-bar: #f59e0b;
+  --low: #93c5fd;
+  --low-bg: rgb(59 130 246 / 0.1);
+  --low-border: rgb(59 130 246 / 0.35);
+  --low-bar: #3b82f6;
+
+  --flow-node-fill: #18181b;
+  --flow-node-stroke: #52525b;
+  --flow-changed-fill: #1e1b4b;
+  --flow-changed-stroke: #818cf8;
+  --flow-cluster-fill: #141417;
+  --flow-line: #71717a;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Base
+ * ------------------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: calc(var(--topbar-height) + 16px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0.12em 0.36em;
+  overflow-wrap: anywhere;
+}
+
+code.nowrap {
+  white-space: nowrap;
+}
+
+h1 code,
+h3 code {
+  font-size: 0.85em;
+  font-weight: inherit;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.icon {
+  flex: none;
+  vertical-align: -0.15em;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 64px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Top bar
+ * ------------------------------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--topbar-height);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+.topbar-inner {
+  max-width: 920px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  flex: none;
+}
+
+.brand:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--accent), #22c55e);
+}
+
+.section-nav {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.section-nav ul {
+  display: flex;
+  gap: 2px;
+  list-style: none;
+}
+
+.section-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.section-nav a:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  text-decoration: none;
+}
+
+.section-nav a[aria-current='true'] {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.nav-count {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--code-bg);
+  color: var(--text-muted);
+  line-height: 18px;
+}
+
+.theme-toggle {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.theme-toggle .icon-sun {
+  display: none;
+}
+
+:root[data-theme='dark'] .theme-toggle .icon-sun {
+  display: block;
+}
+
+:root[data-theme='dark'] .theme-toggle .icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .theme-toggle .icon-sun {
+    display: block;
+  }
+
+  :root:not([data-theme='light']) .theme-toggle .icon-moon {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Hero
+ * ------------------------------------------------------------------------------------- */
+
+.hero {
+  padding: 48px 0 8px;
+}
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.eyebrow a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.eyebrow a:hover {
+  color: var(--accent);
+}
+
+.hero h1 {
+  font-size: clamp(26px, 4vw, 34px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.diffstat {
+  display: inline-flex;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.add {
+  color: var(--add);
+}
+
+.del {
+  color: var(--del);
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Sections
+ * ------------------------------------------------------------------------------------- */
+
+.section {
+  padding-top: 44px;
+}
+
+.section h2 {
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.section > h2 {
+  margin-bottom: 14px;
+}
+
+.section-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-tools {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.text-button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.empty {
+  color: var(--text-muted);
+}
+
+.empty.card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px 20px;
+}
+
+.empty.card .icon {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--add);
+}
+
+.empty.card p + p {
+  margin-top: 4px;
+}
+
+.empty.card strong {
+  color: var(--text);
+}
+
+/* Summary */
+
+.prose {
+  font-size: 16.5px;
+  line-height: 1.7;
+  max-width: 70ch;
+}
+
+.prose p + p {
+  margin-top: 0.9em;
+}
+
+.glance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  list-style: none;
+}
+
+.glance a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.glance a:hover {
+  border-color: var(--border-strong);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.glance-value {
+  font-weight: 650;
+  font-size: 15px;
+}
+
+.glance-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.glance-high .glance-label {
+  color: var(--high);
+}
+
+.glance-medium .glance-label {
+  color: var(--medium);
+}
+
+/* Changes */
+
+.change-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.change {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.change > summary {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'chevron kind path stat'
+    '. . preview preview';
+  align-items: center;
+  column-gap: 10px;
+  padding: 11px 16px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius);
+}
+
+.change > summary::-webkit-details-marker {
+  display: none;
+}
+
+.change > summary:hover {
+  background: var(--surface-hover);
+}
+
+.change[open] > summary {
+  border-bottom: 1px solid var(--border);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.change .icon-chevron {
+  grid-area: chevron;
+  color: var(--text-subtle);
+  transition: transform 120ms ease;
+}
+
+.change[open] .icon-chevron {
+  transform: rotate(90deg);
+}
+
+.kind {
+  grid-area: kind;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+
+.kind-added {
+  color: var(--kind-added);
+  background: var(--kind-added-bg);
+}
+
+.kind-modified {
+  color: var(--kind-modified);
+  background: var(--kind-modified-bg);
+}
+
+.kind-deleted {
+  color: var(--kind-deleted);
+  background: var(--kind-deleted-bg);
+}
+
+.kind-renamed {
+  color: var(--kind-renamed);
+  background: var(--kind-renamed-bg);
+}
+
+.path {
+  grid-area: path;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+.path-dir {
+  color: var(--text-subtle);
+}
+
+.path-base {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.change .diffstat {
+  grid-area: stat;
+  font-size: 12.5px;
+}
+
+.change-preview {
+  grid-area: preview;
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change[open] .change-preview {
+  display: none;
+}
+
+.change-body {
+  padding: 14px 16px 16px 44px;
+  display: grid;
+  gap: 12px;
+}
+
+.change-body dl {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.change-body dl > div {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.change-body dt {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  padding-top: 2px;
+}
+
+.change-body dd {
+  margin: 0;
+}
+
+.renamed-from {
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  justify-self: start;
+}
+
+/* Flow */
+
+.flow {
+  margin: 0;
+  padding: 20px;
+}
+
+.flow-diagram {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  min-height: 120px;
+  align-items: center;
+}
+
+.flow-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.flow-diagram[data-state='failed'] {
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.flow-status {
+  font-size: 13.5px;
+}
+
+.flow-diagram[data-state='ready'] .flow-status {
+  display: none;
+}
+
+.flow-diagram[data-state='failed'] + .flow-legend {
+  display: none;
+}
+
+.flow-diagram .node.changed rect,
+.flow-diagram .node.changed polygon,
+.flow-diagram .node.changed path,
+.flow-diagram .node.changed circle,
+.flow-diagram .node.changed ellipse {
+  fill: var(--flow-changed-fill) !important;
+  stroke: var(--flow-changed-stroke) !important;
+}
+
+.flow-diagram .node.context rect,
+.flow-diagram .node.context polygon,
+.flow-diagram .node.context path,
+.flow-diagram .node.context circle,
+.flow-diagram .node.context ellipse {
+  fill: var(--flow-node-fill) !important;
+  stroke: var(--flow-node-stroke) !important;
+}
+
+.flow-diagram .edgeLabel,
+.flow-diagram .edgeLabel p,
+.flow-diagram .labelBkg {
+  background-color: var(--surface) !important;
+  color: var(--text-muted) !important;
+}
+
+.flow-diagram .edgeLabel rect {
+  fill: var(--surface) !important;
+  opacity: 1 !important;
+}
+
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  justify-content: center;
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.swatch-changed {
+  background: var(--flow-changed-fill);
+  border: 2px solid var(--flow-changed-stroke);
+}
+
+.swatch-context {
+  background: var(--flow-node-fill);
+  border: 1px dashed var(--flow-node-stroke);
+}
+
+.flow figcaption {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14.5px;
+}
+
+.flow-text {
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.flow-text > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.flow-text-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.flow-text h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  margin-bottom: 8px;
+}
+
+.flow-text ul {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.flow-text li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.flow-text li code {
+  font-size: 12px;
+}
+
+.flow-node-name {
+  font-weight: 600;
+}
+
+.flow-node-name.is-changed {
+  color: var(--accent);
+}
+
+/* Risks */
+
+.risk-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.risk {
+  position: relative;
+  padding: 14px 18px 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.risk::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+}
+
+.severity-high::before {
+  background: var(--high-bar);
+}
+
+.severity-medium::before {
+  background: var(--medium-bar);
+}
+
+.severity-low::before {
+  background: var(--low-bar);
+}
+
+.risk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.severity-badge .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.severity-high .severity-badge {
+  color: var(--high);
+  background: var(--high-bg);
+  border-color: var(--high-border);
+}
+
+.severity-medium .severity-badge {
+  color: var(--medium);
+  background: var(--medium-bg);
+  border-color: var(--medium-border);
+}
+
+.severity-low .severity-badge {
+  color: var(--low);
+  background: var(--low-bg);
+  border-color: var(--low-border);
+}
+
+.risk-title {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.location {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+a.location {
+  color: var(--accent);
+}
+
+.risk-reason {
+  margin-top: 8px;
+  color: var(--text);
+}
+
+/* Tests */
+
+.progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--code-bg);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--add);
+  border-radius: inherit;
+  transition: width 160ms ease;
+}
+
+.checklist {
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.checklist > li {
+  padding: 12px 16px;
+}
+
+.checklist > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.check {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  cursor: pointer;
+}
+
+.check input {
+  position: absolute;
+  opacity: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.check-box {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.check-box::after {
+  content: '';
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-1px) rotate(-45deg);
+  opacity: 0;
+}
+
+.check input:checked + .check-box {
+  background: var(--add);
+  border-color: var(--add);
+}
+
+.check input:checked + .check-box::after {
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .check-box::after {
+  border-color: #052e16;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .check-box::after {
+    border-color: #052e16;
+  }
+}
+
+.check input:focus-visible + .check-box {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.check input:checked ~ .check-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+}
+
+.related {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0 30px;
+}
+
+.related code {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* Footer */
+
+.footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.disclaimer {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.disclaimer strong {
+  color: var(--text);
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin: 20px 0 0;
+}
+
+.meta-grid dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+}
+
+.meta-grid dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.skipped {
+  margin-top: 18px;
+}
+
+.skipped > summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.skipped ul {
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.colophon {
+  margin-top: 20px;
+  color: var(--text-subtle);
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Small screens
+ * ------------------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  .topbar-inner {
+    gap: 12px;
+  }
+
+  .brand {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .hero {
+    padding-top: 32px;
+  }
+
+  .section-nav {
+    -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+    mask-image: linear-gradient(to right, #000 85%, transparent);
+  }
+
+  .glance {
+    gap: 8px;
+  }
+
+  .glance a {
+    padding: 10px 12px;
+  }
+
+  .glance-value {
+    font-size: 14px;
+  }
+
+  .change > summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'chevron path stat'
+      '. kind kind'
+      '. preview preview';
+    row-gap: 4px;
+  }
+
+  .kind {
+    justify-self: start;
+  }
+
+  .change-body {
+    padding-left: 16px;
+  }
+
+  .change-body dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .flow {
+    padding: 14px;
+  }
+
+  .flow-text-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Print
+ * ------------------------------------------------------------------------------------- */
+
+@media print {
+  :root {
+    --bg: #ffffff;
+    --shadow: none;
+  }
+
+  body {
+    font-size: 11pt;
+  }
+
+  .topbar,
+  .skip-link,
+  .section-tools,
+  .file-link,
+  .flow-legend {
+    display: none !important;
+  }
+
+  .container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .hero {
+    padding-top: 0;
+  }
+
+  .section {
+    padding-top: 24px;
+  }
+
+  .change,
+  .risk,
+  .checklist > li,
+  .flow,
+  .glance a {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .change-preview {
+    display: none;
+  }
+
+  a {
+    color: inherit;
+  }
+}
+</style> <script
+          id="mermaid-script"
+          src="https://cdn.jsdelivr.net/npm/mermaid@12.1.0/dist/mermaid.min.js"
+          integrity="sha384-EbBpjO7rlR6eqZEcG7GaPpyk9H9WrMyPWX4d3KvPYltgt8Z8l0z6R56B1qP40pR4"
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer"
+          defer
+        ></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="topbar" role="banner">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="Back to top">
+        <span class="brand-mark" aria-hidden="true"></span>lucidiff
+      </a>
+      <nav class="section-nav" aria-label="Sections">
+        <ul>
+          <li>
+                <a href="#summary" data-nav="summary"
+                  >Summary</a
+                >
+              </li><li>
+                <a href="#changes" data-nav="changes"
+                  >Changes<span class="nav-count">15</span></a
+                >
+              </li><li>
+                <a href="#flow" data-nav="flow"
+                  >Flow</a
+                >
+              </li><li>
+                <a href="#risks" data-nav="risks"
+                  >Risks<span class="nav-count">3</span></a
+                >
+              </li><li>
+                <a href="#tests" data-nav="tests"
+                  >Tests<span class="nav-count">6</span></a
+                >
+              </li>
+        </ul>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle color theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg><svg class="icon icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+    <main id="main" class="container">
+      <header class="hero" id="top">
+    <p class="eyebrow"><a href="https://github.com/sindresorhus/ky/pull/842" rel="noopener noreferrer" target="_blank"
+        >sindresorhus/ky#842 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      ></p>
+    <h1>Wrap fetch network failures in <code class="nowrap">NetworkError</code> and stop retrying unknown errors</h1>
+    <div class="hero-meta">
+      
+      <span>15 files changed</span>
+      <span class="mono diffstat"
+        ><span class="add">+397</span>
+        <span class="del">−47</span></span
+      >
+      
+    </div>
+  </header> <section class="section" id="summary" aria-labelledby="summary-title">
+    <h2 id="summary-title">Summary</h2>
+    <div class="prose summary"><p>Failed <code class="nowrap">fetch</code> calls now reject with a new <code class="nowrap">NetworkError</code> instead of the runtime&#39;s raw <code class="nowrap">TypeError</code>. <code class="nowrap">#fetch</code> wraps the error only when <code class="nowrap">isRawNetworkError</code> recognizes its message, and keeps the original error in <code class="nowrap">cause</code>.</p><p>The retry rule is also narrower. <code class="nowrap">#calculateRetryDelay</code> now retries timeouts (with <code class="nowrap">retryOnTimeout</code>), listed HTTP status codes, and <code class="nowrap">NetworkError</code>. Any other error is thrown at once, so programming bugs no longer cause retries. Both changes alter what callers catch, and the PR updates existing tests to match.</p></div>
+    <ul class="glance" aria-label="At a glance">
+      <li>
+        <a href="#changes"
+          ><span class="glance-value">15 files</span
+          ><span class="glance-label">explained</span></a
+        >
+      </li>
+      <li>
+        <a href="#risks" class="glance-high"
+          ><span class="glance-value">3 risks</span
+          ><span class="glance-label">1 high</span></a
+        >
+      </li>
+      <li>
+        <a href="#tests"
+          ><span class="glance-value">6 checks</span
+          ><span class="glance-label">to verify</span></a
+        >
+      </li>
+    </ul>
+  </section> <section class="section" id="changes" aria-labelledby="changes-title">
+    <div class="section-head">
+      <h2 id="changes-title">Changes</h2>
+      <div class="section-tools">
+              <button type="button" class="text-button" data-expand="all">Expand all</button>
+              <button type="button" class="text-button" data-expand="none">Collapse all</button>
+            </div>
+    </div>
+    <ul class="change-list">
+            <li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/core/Ky.ts"
+    ><span class="path-dir">source/core/</span><span class="path-base">Ky.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+35</span>
+          <span class="del">−14</span></span
+        >
+        <span class="change-preview"><code class="nowrap">#fetch</code> now wraps the <code class="nowrap">fetch</code> and <code class="nowrap">timeout</code> calls in <code class="nowrap">try</code>/<code class="nowrap">catch</code> and rethrows recognized network failures as <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> returns early for timeouts and HTTP errors, retries a <code class="nowrap">NetworkError</code>, and throws every other error.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd><code class="nowrap">#fetch</code> now wraps the <code class="nowrap">fetch</code> and <code class="nowrap">timeout</code> calls in <code class="nowrap">try</code>/<code class="nowrap">catch</code> and rethrows recognized network failures as <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> returns early for timeouts and HTTP errors, retries a <code class="nowrap">NetworkError</code>, and throws every other error.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Before, any error that was not a timeout or a filtered <code class="nowrap">HTTPError</code> was retried, including bugs in hooks or custom <code class="nowrap">fetch</code> code. Now the retry decision depends on the error type.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-added">Added</span>
+        <span class="path mono" title="source/utils/is-network-error.ts"
+    ><span class="path-dir">source/utils/</span><span class="path-base">is-network-error.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+49</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Adds <code class="nowrap">isRawNetworkError</code>, inlined from <code class="nowrap">is-network-error</code> 1.3.1. It matches a <code class="nowrap">TypeError</code> by the exact message that each runtime uses for network failures, such as <code class="nowrap">Failed to fetch</code> and <code class="nowrap">fetch failed</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds <code class="nowrap">isRawNetworkError</code>, inlined from <code class="nowrap">is-network-error</code> 1.3.1. It matches a <code class="nowrap">TypeError</code> by the exact message that each runtime uses for network failures, such as <code class="nowrap">Failed to fetch</code> and <code class="nowrap">fetch failed</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd><code class="nowrap">#fetch</code> uses it to decide which errors become <code class="nowrap">NetworkError</code>. An error with any other message stays unwrapped and is no longer retried.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-598f918f5d95b947406e73cbd2f3d347b36a94109800ef3069d6e768a4f56429" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-added">Added</span>
+        <span class="path mono" title="source/errors/NetworkError.ts"
+    ><span class="path-dir">source/errors/</span><span class="path-base">NetworkError.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+17</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Adds <code class="nowrap">NetworkError</code>, a <code class="nowrap">KyError</code> subclass with a <code class="nowrap">request</code> property and the original error in <code class="nowrap">cause</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds <code class="nowrap">NetworkError</code>, a <code class="nowrap">KyError</code> subclass with a <code class="nowrap">request</code> property and the original error in <code class="nowrap">cause</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Callers can now tell network failures apart from <code class="nowrap">HTTPError</code> and <code class="nowrap">TimeoutError</code> without matching messages.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-dd8ea2afc3509b01cd04de98b9b464d66570a56b4801140afef877e293f018f2" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/utils/type-guards.ts"
+    ><span class="path-dir">source/utils/</span><span class="path-base">type-guards.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+24</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or an error <code class="nowrap">name</code> of <code class="nowrap">NetworkError</code>. <code class="nowrap">isKyError</code> now also returns <code class="nowrap">true</code> for a <code class="nowrap">NetworkError</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or an error <code class="nowrap">name</code> of <code class="nowrap">NetworkError</code>. <code class="nowrap">isKyError</code> now also returns <code class="nowrap">true</code> for a <code class="nowrap">NetworkError</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>The name check lets the guard work across separate copies of Ky, like the other guards.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-74f46ee505bc3de73cb416f36b6476393db46ab09673c90d4a376b47c35a49fe" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/index.ts"
+    ><span class="path-dir">source/</span><span class="path-base">index.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+2</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Exports <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Exports <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Makes the new class and guard part of the public API.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-fcd423a0b6ae0654240ee2c1cb0b023707df57b7d1c7a3834c5bfbef7d901da5" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/types/options.ts"
+    ><span class="path-dir">source/types/</span><span class="path-base">options.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+4</span>
+          <span class="del">−6</span></span
+        >
+        <span class="change-preview">Rewrites the <code class="nowrap">retry</code> docs: network errors are retried for retriable methods, other errors are thrown, and a long <code class="nowrap">Retry-After</code> is capped at <code class="nowrap">maxRetryAfter</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Rewrites the <code class="nowrap">retry</code> docs: network errors are retried for retriable methods, other errors are thrown, and a long <code class="nowrap">Retry-After</code> is capped at <code class="nowrap">maxRetryAfter</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Removes the outdated sentence that timeouts never trigger retries.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-31bd6859e08133a5ae483b0a09a0c550e1fa64301beafaa08298619f17d2befd" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/types/retry.ts"
+    ><span class="path-dir">source/types/</span><span class="path-base">retry.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+2</span>
+          <span class="del">−2</span></span
+        >
+        <span class="change-preview">Updates the <code class="nowrap">maxRetryAfter</code> and <code class="nowrap">shouldRetry</code> docs to match the new rules.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Updates the <code class="nowrap">maxRetryAfter</code> and <code class="nowrap">shouldRetry</code> docs to match the new rules.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd><code class="nowrap">shouldRetry</code> returning <code class="nowrap">undefined</code> now means &quot;retry only known error types&quot;.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-9707f1a0af622541821773ee1c331da0ac46c5f170282c49d2212588d7764daf" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/types/hooks.ts"
+    ><span class="path-dir">source/types/</span><span class="path-base">hooks.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+3</span>
+          <span class="del">−3</span></span
+        >
+        <span class="change-preview">Updates the <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> docs to name <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Updates the <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> docs to name <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Hooks now receive a <code class="nowrap">NetworkError</code> where they used to receive a raw <code class="nowrap">TypeError</code>.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-094b02c7c92599bd2ece97ca886bb004e18e43279adeaf84e4a857ce9d7c8ad8" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="test/retry.ts"
+    ><span class="path-dir">test/</span><span class="path-base">retry.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+216</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">Adds tests: <code class="nowrap">NetworkError</code> wraps fetch failures, is retried by default, is not retried for <code class="nowrap">POST</code>, and reaches <code class="nowrap">shouldRetry</code> and <code class="nowrap">beforeError</code> with its <code class="nowrap">cause</code>. Also tests that a non-network <code class="nowrap">TypeError</code> is neither wrapped nor retried.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds tests: <code class="nowrap">NetworkError</code> wraps fetch failures, is retried by default, is not retried for <code class="nowrap">POST</code>, and reaches <code class="nowrap">shouldRetry</code> and <code class="nowrap">beforeError</code> with its <code class="nowrap">cause</code>. Also tests that a non-network <code class="nowrap">TypeError</code> is neither wrapped nor retried.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Covers both new rules: the wrapping in <code class="nowrap">#fetch</code> and the retry decision in <code class="nowrap">#calculateRetryDelay</code>.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-057f1cac975e0d13462dc0b8af0a28b3435beb1d59652a11b20a180026546b70" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="test/hooks.ts"
+    ><span class="path-dir">test/</span><span class="path-base">hooks.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+10</span>
+          <span class="del">−9</span></span
+        >
+        <span class="change-preview">Replaces fake failures such as <code>new Error(&#39;simulated network failure&#39;)</code> with <code>new TypeError(&#39;Failed to fetch&#39;)</code>, and asserts <code class="nowrap">isNetworkError(error)</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Replaces fake failures such as <code>new Error(&#39;simulated network failure&#39;)</code> with <code>new TypeError(&#39;Failed to fetch&#39;)</code>, and asserts <code class="nowrap">isNetworkError(error)</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>The old fake errors are no longer retried. This shows that custom <code class="nowrap">fetch</code> errors with other messages lose their retries.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-86368c447a569cc00ca9d074ef7fe779154a6f1187706619d228ef2a4241759a" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="test/headers.ts"
+    ><span class="path-dir">test/</span><span class="path-base">headers.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+2</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">Reads the Undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Reads the Undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>The Undici <code class="nowrap">TypeError</code> now sits one level deeper, inside <code class="nowrap">NetworkError</code>. Caller code that reads <code class="nowrap">error.cause.code</code> must change the same way.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-e0bd4137c32f919d49496f6183e9ef3740238f2f3214d1561bc35ba6ce2e809b" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="test/memory-leak.ts"
+    ><span class="path-dir">test/</span><span class="path-base">memory-leak.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+2</span>
+          <span class="del">−3</span></span
+        >
+        <span class="change-preview">Expects <code class="nowrap">NetworkError</code> instead of a <code class="nowrap">TypeError</code> with the message <code class="nowrap">fetch failed</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Expects <code class="nowrap">NetworkError</code> instead of a <code class="nowrap">TypeError</code> with the message <code class="nowrap">fetch failed</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Follows the new error type.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-aba702dbd8d908680657855a9e2ab8aa0b0fc0c0c32c8b7b8f616caafc52d8b4" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="readme.md"
+    ><span class="path-dir"></span><span class="path-base">readme.md</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+29</span>
+          <span class="del">−5</span></span
+        >
+        <span class="change-preview">Documents <code class="nowrap">NetworkError</code>, <code class="nowrap">isNetworkError</code>, and the new retry rules.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Documents <code class="nowrap">NetworkError</code>, <code class="nowrap">isNetworkError</code>, and the new retry rules.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Keeps the readme in sync with the type docs.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-5a831ea67cf5cf8703b0de46901ab25bd191f56b320053be9332d9a3b0d01d15" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/errors/KyError.ts"
+    ><span class="path-dir">source/errors/</span><span class="path-base">KyError.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+1</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">Lists <code class="nowrap">NetworkError</code> among the subclasses in the class doc.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Lists <code class="nowrap">NetworkError</code> among the subclasses in the class doc.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Doc-only change.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-488177b656c122139e0c3b3c176c3b9904e6831c0b5f48350ff40302b60242be" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/errors/HTTPError.ts"
+    ><span class="path-dir">source/errors/</span><span class="path-base">HTTPError.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+1</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">Mentions the <code class="nowrap">options</code> property in the class doc.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Mentions the <code class="nowrap">options</code> property in the class doc.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Doc-only change.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1006f3316aa6ec80178617fdeb867c7452b7818202fa47da5470544190f64c04" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li>
+          </ul>
+  </section> <section class="section" id="flow" aria-labelledby="flow-title">
+    <h2 id="flow-title">Flow</h2>
+    <figure class="flow card">
+            <div
+                      class="flow-diagram"
+                      data-flow-diagram
+                      data-state="loading"
+                      role="img"
+                      aria-label="A request goes through `#fetch`, which calls the configured `fetch`. A failure that `isRawNetworkError` recognizes becomes a `NetworkError`. `#calculateRetryDelay` uses `isNetworkError` to decide whether to retry."
+                    >
+                      <p class="flow-status muted" data-flow-status>Rendering diagram…</p>
+                    </div>
+                    <div class="flow-legend" aria-hidden="true">
+                      <span class="legend-item"
+                        ><span class="swatch swatch-changed"></span>Changed in this PR</span
+                      >
+                      <span class="legend-item"
+                        ><span class="swatch swatch-context"></span>Unchanged context</span
+                      >
+                    </div>
+            <figcaption>A request goes through <code class="nowrap">#fetch</code>, which calls the configured <code class="nowrap">fetch</code>. A failure that <code class="nowrap">isRawNetworkError</code> recognizes becomes a <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> uses <code class="nowrap">isNetworkError</code> to decide whether to retry.</figcaption>
+            <details class="flow-text" data-flow-text >
+    <summary>Components and connections</summary>
+    <div class="flow-text-body">
+      <div>
+        <h3>Components</h3>
+        <ul>
+          <li>
+                <span class="flow-node-name "
+                  >ky.get() and friends</span
+                >
+                <span class="muted"
+                  >entry point</span
+                >
+                
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >#fetch</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>source/core/Ky.ts</code>
+              </li><li>
+                <span class="flow-node-name "
+                  >configured fetch</span
+                >
+                <span class="muted"
+                  >external service</span
+                >
+                
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >isRawNetworkError</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>source/utils/is-network-error.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >NetworkError</span
+                >
+                <span class="muted"
+                  >module, changed</span
+                >
+                <code>source/errors/NetworkError.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >#calculateRetryDelay</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>source/core/Ky.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >isNetworkError</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>source/utils/type-guards.ts</code>
+              </li>
+        </ul>
+      </div>
+      <div>
+        <h3>Connections</h3>
+        <ul>
+                <li>
+                      ky.get() and friends → #fetch
+                      <span class="muted">(Request)</span>
+                    </li><li>
+                      #fetch → configured fetch
+                      <span class="muted">(request and options)</span>
+                    </li><li>
+                      #fetch → isRawNetworkError
+                      <span class="muted">(caught error)</span>
+                    </li><li>
+                      #fetch → NetworkError
+                      <span class="muted">(wraps as cause)</span>
+                    </li><li>
+                      NetworkError → #calculateRetryDelay
+                      <span class="muted">(rejected attempt)</span>
+                    </li><li>
+                      #calculateRetryDelay → isNetworkError
+                      <span class="muted">(error type check)</span>
+                    </li><li>
+                      #calculateRetryDelay → #fetch
+                      <span class="muted">(retry after delay)</span>
+                    </li>
+              </ul>
+      </div>
+    </div>
+  </details>
+          </figure>
+  </section>
+      <section class="section" id="risks" aria-labelledby="risks-title">
+    <div class="section-head">
+      <h2 id="risks-title">Risks</h2>
+      <p class="section-note">1 high · 1 medium · 1 low</p>
+    </div>
+    <ol class="risk-list">
+            <li class="risk severity-high" id="risk-r_79895783f1">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>High</span>
+      <h3 class="risk-title">Network failures are no longer <code class="nowrap">TypeError</code> instances</h3>
+    </div>
+    <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04R832-R835" rel="noopener noreferrer" target="_blank"
+        >source/core/Ky.ts:832–835 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason"><code class="nowrap">#fetch</code> now rethrows recognized failures as <code class="nowrap">NetworkError</code>, which extends <code class="nowrap">KyError</code>, not <code class="nowrap">TypeError</code>. Caller code that checks <code class="nowrap">error instanceof TypeError</code>, <code>error.message === &#39;Failed to fetch&#39;</code>, or <code class="nowrap">error.cause.code</code> stops matching. The PR had to change such checks in <code class="nowrap">test/hooks.ts</code>, <code class="nowrap">test/headers.ts</code>, and <code class="nowrap">test/memory-leak.ts</code>. Release this as a breaking change.</p>
+  </li><li class="risk severity-medium" id="risk-r_1fc518eeba">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
+      <h3 class="risk-title">Errors from custom <code class="nowrap">fetch</code> implementations are no longer retried</h3>
+    </div>
+    <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04R490-R493" rel="noopener noreferrer" target="_blank"
+        >source/core/Ky.ts:490–493 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason">Line 491 throws every error that is not a <code class="nowrap">NetworkError</code>. <code class="nowrap">#fetch</code> creates a <code class="nowrap">NetworkError</code> only for a <code class="nowrap">TypeError</code> with a known message (line 833). A custom <code class="nowrap">fetch</code> such as <code class="nowrap">node-fetch</code> rejects with its own <code class="nowrap">FetchError</code> on <code class="nowrap">ECONNREFUSED</code>, so a <code class="nowrap">GET</code> that Ky used to retry now fails on the first attempt.</p>
+  </li><li class="risk severity-low" id="risk-r_19a70b115a">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
+      <h3 class="risk-title"><code class="nowrap">isNetworkError</code> also matches the standard <code class="nowrap">DOMException</code> named <code class="nowrap">NetworkError</code></h3>
+    </div>
+    <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-74f46ee505bc3de73cb416f36b6476393db46ab09673c90d4a376b47c35a49feR75-R77" rel="noopener noreferrer" target="_blank"
+        >source/utils/type-guards.ts:75–77 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason">Line 76 accepts any error whose <code class="nowrap">name</code> is <code class="nowrap">NetworkError</code>. Browsers use that name for a standard <code class="nowrap">DOMException</code>, which has no <code class="nowrap">request</code> property. Code that follows the documented example and reads <code class="nowrap">error.request.url</code> after the guard throws a <code class="nowrap">TypeError</code> for such an error.</p>
+  </li>
+          </ol>
+  </section> <section class="section" id="tests" aria-labelledby="tests-title">
+    <div class="section-head">
+      <h2 id="tests-title">Test checklist</h2>
+      <div class="section-tools">
+              <span class="section-note" data-check-progress aria-live="polite"
+                >0 of 6 done</span
+              >
+              <button type="button" class="text-button" data-check-reset>Reset</button>
+            </div>
+    </div>
+    <div class="progress" aria-hidden="true">
+              <span class="progress-bar" data-check-bar></span>
+            </div>
+            <ul class="checklist">
+              <li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_c870fee014" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">In Node, request a closed local port with <code class="nowrap">ky.get(url, {retry: 2})</code>. Confirm it rejects with <code class="nowrap">NetworkError</code> after 3 attempts and that <code class="nowrap">error.cause</code> is Undici&#39;s <code class="nowrap">TypeError(&#39;fetch failed&#39;)</code>.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li><li><code title="source/utils/is-network-error.ts">is-network-error.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_f596b20a8e" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Pass <code class="nowrap">fetch: nodeFetch</code> and request a closed port. Confirm whether Ky still retries, and document the result for custom <code class="nowrap">fetch</code> users.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_fba5739866" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Search the readme and changelog for an upgrade note that tells users to replace <code class="nowrap">instanceof TypeError</code> and <code class="nowrap">error.cause.code</code> checks.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="readme.md">readme.md</code></li><li><code title="source/errors/NetworkError.ts">NetworkError.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_ca9d41ec96" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Call <code>isNetworkError(new DOMException(&#39;x&#39;, &#39;NetworkError&#39;))</code> and decide whether <code class="nowrap">true</code> is the intended result.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/utils/type-guards.ts">type-guards.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_ac3c796b84" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Set <code>retry: {retryOnTimeout: true, limit: 2}</code> against a slow endpoint and confirm timeouts are still retried.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_58806fa10b" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Make a custom <code class="nowrap">fetch</code> throw <code class="nowrap">new Error(&#39;bug&#39;)</code> for a <code class="nowrap">GET</code>, and confirm Ky throws it once, without a retry.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li><li><code title="test/retry.ts">retry.ts</code></li>
+                          </ul>
+                  </li>
+            </ul>
+  </section> <footer class="footer">
+    <div class="disclaimer" role="note">
+      <strong>AI-generated.</strong> A language model wrote this explainer from the diff. It can be
+      wrong or incomplete. Use it to guide your review. It does not replace reading the code.
+    </div>
+    <dl class="meta-grid">
+      <div>
+            <dt>Model</dt>
+            <dd><code>claude-opus-5-5</code></dd>
+          </div><div>
+            <dt>Provider</dt>
+            <dd>replay</dd>
+          </div><div>
+            <dt>Generated</dt>
+            <dd><time datetime="2026-10-02T20:00:00.000Z">2026-10-02 20:00 UTC</time></dd>
+          </div><div>
+            <dt>Analysis</dt>
+            <dd>1 model call</dd>
+          </div><div>
+            <dt>Tokens</dt>
+            <dd>Not reported</dd>
+          </div><div>
+            <dt>Files analyzed</dt>
+            <dd>15 of 15</dd>
+          </div><div>
+            <dt>Secrets redacted</dt>
+            <dd>0</dd>
+          </div><div>
+            <dt>Risks dropped</dt>
+            <dd>0 (invalid citation)</dd>
+          </div>
+    </dl>
+    
+    <p class="colophon">
+      Generated by lucidiff 0.1.0 · schema v1
+    </p>
+  </footer>
+    </main>
+    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/sindresorhus/ky/pull/842","mermaid":"flowchart TD\n  subgraph g_1[\"source/core/Ky.ts\"]\n    n_fetch_method(\"#35;fetch\")\n    n_retry_delay(\"#35;calculateRetryDelay\")\n  end\n  n_request([\"ky.get#40;#41; and friends\"])\n  n_fetch_impl{{\"configured fetch\"}}\n  n_raw_check(\"isRawNetworkError\")\n  n_network_error[\"NetworkError\"]\n  n_guard(\"isNetworkError\")\n  n_request -->|\"Request\"| n_fetch_method\n  n_fetch_method -->|\"request and options\"| n_fetch_impl\n  n_fetch_method -->|\"caught error\"| n_raw_check\n  n_fetch_method -->|\"wraps as cause\"| n_network_error\n  n_network_error -->|\"rejected attempt\"| n_retry_delay\n  n_retry_delay -->|\"error type check\"| n_guard\n  n_retry_delay -->|\"retry after delay\"| n_fetch_method\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_fetch_method,n_raw_check,n_network_error,n_retry_delay,n_guard changed\n  class n_request,n_fetch_impl context"}</script>
+    <script>// Page behavior for the generated explainer. Plain browser JavaScript, no dependencies.
+//
+// 1. Theme toggle (light/dark), saved in localStorage.
+// 2. Flow diagram rendering with Mermaid, with a text fallback.
+// 3. Test checklist state, saved in localStorage per pull request.
+// 4. Expand/collapse all change cards, and open all cards for printing.
+// 5. Highlight the section link for the section in view.
+(function () {
+  'use strict';
+
+  var root = document.documentElement;
+  var dataElement = document.getElementById('lucidiff-data');
+  var data = dataElement ? JSON.parse(dataElement.textContent || '{}') : {};
+
+  function storageGet(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function storageSet(key, value) {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch {
+      // Storage is optional. The page works without it.
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // 1. Theme
+  // ---------------------------------------------------------------------------------------
+  var systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function currentTheme() {
+    var explicit = root.dataset.theme;
+    if (explicit === 'light' || explicit === 'dark') return explicit;
+    return systemDark.matches ? 'dark' : 'light';
+  }
+
+  var toggle = document.querySelector('[data-theme-toggle]');
+  function updateToggleLabel() {
+    if (!toggle) return;
+    var next = currentTheme() === 'dark' ? 'light' : 'dark';
+    toggle.setAttribute('aria-label', 'Switch to ' + next + ' theme');
+    toggle.setAttribute('title', 'Switch to ' + next + ' theme');
+  }
+
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      var next = currentTheme() === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      storageSet('lucidiff:theme', next);
+      updateToggleLabel();
+      renderFlow();
+    });
+  }
+  systemDark.addEventListener('change', function () {
+    updateToggleLabel();
+    if (!root.dataset.theme) renderFlow();
+  });
+  updateToggleLabel();
+
+  // ---------------------------------------------------------------------------------------
+  // 2. Flow diagram
+  // ---------------------------------------------------------------------------------------
+  var diagram = document.querySelector('[data-flow-diagram]');
+  var flowText = document.querySelector('[data-flow-text]');
+  var renderCount = 0;
+
+  function cssVar(name) {
+    return getComputedStyle(root).getPropertyValue(name).trim();
+  }
+
+  function showFlowFallback(message) {
+    if (!diagram) return;
+    diagram.dataset.state = 'failed';
+    diagram.removeAttribute('role');
+    var status = diagram.querySelector('[data-flow-status]');
+    if (status) status.textContent = message;
+    if (flowText) flowText.open = true;
+  }
+
+  function renderFlow() {
+    if (!diagram || !data.mermaid) return;
+    if (typeof window.mermaid === 'undefined') return;
+    var mermaid = window.mermaid;
+    var font = cssVar('--font-sans');
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      fontFamily: font,
+      flowchart: {
+        curve: 'basis',
+        padding: 14,
+        nodeSpacing: 48,
+        rankSpacing: 56,
+        wrappingWidth: 180,
+      },
+      themeVariables: {
+        fontFamily: font,
+        fontSize: '14px',
+        background: cssVar('--surface'),
+        primaryColor: cssVar('--flow-node-fill'),
+        primaryBorderColor: cssVar('--flow-node-stroke'),
+        primaryTextColor: cssVar('--text'),
+        secondaryColor: cssVar('--flow-cluster-fill'),
+        tertiaryColor: cssVar('--flow-cluster-fill'),
+        lineColor: cssVar('--flow-line'),
+        textColor: cssVar('--text-muted'),
+        clusterBkg: cssVar('--flow-cluster-fill'),
+        clusterBorder: cssVar('--border'),
+        edgeLabelBackground: cssVar('--surface'),
+        titleColor: cssVar('--text-muted'),
+      },
+    });
+    renderCount += 1;
+    mermaid
+      .render('lucidiff-flow-' + renderCount, data.mermaid)
+      .then(function (result) {
+        diagram.innerHTML = result.svg;
+        diagram.dataset.state = 'ready';
+      })
+      .catch(function () {
+        showFlowFallback('The diagram could not be drawn, so it is shown as text below.');
+      });
+  }
+
+  if (diagram && data.mermaid) {
+    var mermaidScript = document.getElementById('mermaid-script');
+    if (typeof window.mermaid !== 'undefined') {
+      renderFlow();
+    } else if (mermaidScript) {
+      mermaidScript.addEventListener('load', renderFlow);
+      mermaidScript.addEventListener('error', function () {
+        showFlowFallback(
+          'Mermaid could not load (are you offline?), so the flow is shown as text below.',
+        );
+      });
+    } else {
+      showFlowFallback(
+        'This page was generated without Mermaid, so the flow is shown as text below.',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // 3. Test checklist
+  // ---------------------------------------------------------------------------------------
+  var checkboxes = Array.prototype.slice.call(document.querySelectorAll('[data-check-id]'));
+  var progressText = document.querySelector('[data-check-progress]');
+  var progressBar = document.querySelector('[data-check-bar]');
+  var resetButton = document.querySelector('[data-check-reset]');
+  var checksKey = 'lucidiff:checks:' + (data.storageKey || location.pathname);
+
+  function loadChecks() {
+    try {
+      var parsed = JSON.parse(storageGet(checksKey) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function updateProgress() {
+    var done = checkboxes.filter(function (box) {
+      return box.checked;
+    }).length;
+    if (progressText) progressText.textContent = done + ' of ' + checkboxes.length + ' done';
+    if (progressBar) {
+      progressBar.style.width = checkboxes.length ? (done / checkboxes.length) * 100 + '%' : '0';
+    }
+  }
+
+  function saveChecks() {
+    var checked = checkboxes
+      .filter(function (box) {
+        return box.checked;
+      })
+      .map(function (box) {
+        return box.dataset.checkId;
+      });
+    storageSet(checksKey, checked.length ? JSON.stringify(checked) : null);
+  }
+
+  var saved = loadChecks();
+  checkboxes.forEach(function (box) {
+    box.checked = saved.indexOf(box.dataset.checkId) !== -1;
+    box.addEventListener('change', function () {
+      saveChecks();
+      updateProgress();
+    });
+  });
+  if (resetButton) {
+    resetButton.addEventListener('click', function () {
+      checkboxes.forEach(function (box) {
+        box.checked = false;
+      });
+      saveChecks();
+      updateProgress();
+    });
+  }
+  updateProgress();
+
+  // ---------------------------------------------------------------------------------------
+  // 4. Change cards and printing
+  // ---------------------------------------------------------------------------------------
+  var cards = Array.prototype.slice.call(document.querySelectorAll('details.change'));
+  Array.prototype.forEach.call(document.querySelectorAll('[data-expand]'), function (button) {
+    button.addEventListener('click', function () {
+      var open = button.dataset.expand === 'all';
+      cards.forEach(function (card) {
+        card.open = open;
+      });
+    });
+  });
+
+  var openBeforePrint = [];
+  window.addEventListener('beforeprint', function () {
+    openBeforePrint = Array.prototype.slice.call(document.querySelectorAll('details'));
+    openBeforePrint = openBeforePrint.map(function (element) {
+      var wasOpen = element.open;
+      element.open = true;
+      return { element: element, wasOpen: wasOpen };
+    });
+  });
+  window.addEventListener('afterprint', function () {
+    openBeforePrint.forEach(function (entry) {
+      entry.element.open = entry.wasOpen;
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------
+  // 5. Active section in the top bar
+  // ---------------------------------------------------------------------------------------
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('[data-nav]'));
+  if ('IntersectionObserver' in window && navLinks.length) {
+    var visible = {};
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          visible[entry.target.id] = entry.isIntersecting;
+        });
+        var active = null;
+        for (var index = 0; index < navLinks.length; index += 1) {
+          if (visible[navLinks[index].dataset.nav]) {
+            active = navLinks[index];
+            break;
+          }
+        }
+        navLinks.forEach(function (link) {
+          if (link === active) link.setAttribute('aria-current', 'true');
+          else link.removeAttribute('aria-current');
+        });
+      },
+      { rootMargin: '-64px 0px -55% 0px' },
+    );
+    navLinks.forEach(function (link) {
+      var section = document.getElementById(link.dataset.nav);
+      if (section) observer.observe(section);
+    });
+  }
+})();
+</script>
+  </body>
+</html>

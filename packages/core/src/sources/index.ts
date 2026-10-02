@@ -11,7 +11,12 @@ export type ExplainInput =
   /** A GitHub pull request URL, or the shorthand "owner/repo#123". */
   | { kind: 'github'; url: string }
   /** A local git range. Empty means uncommitted changes. */
-  | { kind: 'git'; range?: string; cwd?: string };
+  | { kind: 'git'; range?: string; cwd?: string }
+  /**
+   * Bring your own source: a change set you built yourself, for integrations that already
+   * have the diff and PR metadata (bots, CI jobs, other code hosts).
+   */
+  | { kind: 'loaded'; loaded: LoadedSource };
 
 export interface SourceOptions {
   github?: GitHubOptions;
@@ -40,6 +45,8 @@ export async function loadSource(
         ...options.git,
         ...(input.cwd ? { cwd: input.cwd } : {}),
       });
+    case 'loaded':
+      return input.loaded;
   }
 }
 

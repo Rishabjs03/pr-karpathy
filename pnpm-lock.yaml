@@ -23,6 +23,9 @@ importers:
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
+      ai:
+        specifier: ^7.0.127
+        version: 7.0.127(zod@4.6.5)
       eslint:
         specifier: ^10.11.0
         version: 10.11.0

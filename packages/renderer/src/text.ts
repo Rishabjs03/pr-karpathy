@@ -7,17 +7,29 @@
  */
 import { escapeHtml, raw, type SafeHtml } from './html';
 
+/**
+ * Code spans up to this length never wrap, so a flag such as `-orecord.log` is not split
+ * after its leading dash. Longer spans (paths, long identifiers) may wrap on narrow screens.
+ */
+const NOWRAP_CODE_MAX = 28;
+
 /** Escapes text and turns `backtick spans` into `<code>` elements. */
 export function inline(text: string): SafeHtml {
   const parts = text.split(/(`[^`\n]+`)/g);
   const out = parts
-    .map((part) =>
-      part.length > 2 && part.startsWith('`') && part.endsWith('`')
-        ? `<code>${escapeHtml(part.slice(1, -1))}</code>`
-        : escapeHtml(part),
-    )
+    .map((part) => {
+      if (!(part.length > 2 && part.startsWith('`') && part.endsWith('`'))) return escapeHtml(part);
+      const code = part.slice(1, -1);
+      const attribute = code.length <= NOWRAP_CODE_MAX ? ' class="nowrap"' : '';
+      return `<code${attribute}>${escapeHtml(code)}</code>`;
+    })
     .join('');
   return raw(out);
+}
+
+/** Removes the backticks from code spans, for plain-text contexts such as `<title>`. */
+export function plainText(text: string): string {
+  return text.replace(/`([^`\n]+)`/g, '$1');
 }
 
 /** Splits text on blank lines and renders each block as a paragraph. */

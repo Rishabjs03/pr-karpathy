@@ -79,6 +79,8 @@ export function createProgram(io: CliIO, abortSignal?: AbortSignal): Command {
       writeErr: (text) => io.stderr.write(text),
     })
     .exitOverride()
+    // Options after a subcommand name belong to that subcommand (`render x.json -o y.html`).
+    .enablePositionalOptions()
     .action(async (input: string | undefined, options, command: Command) => {
       const globals = command.optsWithGlobals<GlobalOptions>();
       await explainCommand(

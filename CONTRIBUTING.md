@@ -59,6 +59,9 @@ on its side of that line.
 | Render the sample page to `.sample/`           | `pnpm sample` (add `--offline` to embed Mermaid)                      |
 | Screenshot a page in light and dark mode       | `node scripts/screenshot.mjs .sample/sample.html .sample/shot --full` |
 | Recompile the sample flow after compiler edits | `node scripts/update-sample-flow.mjs`                                 |
+| Regenerate the examples (replay, no API key)   | `pnpm examples`                                                       |
+| Regenerate the examples with a live model      | `pnpm build && node scripts/generate-examples.mjs --live`             |
+| Regenerate the README screenshots              | `node scripts/readme-images.mjs`                                      |
 | Add a changeset                                | `pnpm changeset`                                                      |
 
 ### Working on the page design
@@ -69,13 +72,21 @@ Run `pnpm sample`, open `.sample/sample.html`, and iterate on
 themes, a narrow window, and print preview. Then run `pnpm test:update` and review the snapshot
 diff.
 
+### Examples
+
+`examples/` holds three real PRs with their generated explainers. After a renderer or pipeline
+change, run `pnpm examples` to re-render them from the stored model answers, and
+`node scripts/readme-images.mjs` if the README screenshots should change. The examples site
+workflow (`.github/workflows/pages.yml`) publishes the folder to GitHub Pages once Pages is
+enabled and the `PAGES_ENABLED` repository variable is `true`.
+
 ### Working on the prompts
 
 The prompts live in `packages/core/src/prompts/`. Each rule there exists for a reason that is
 written next to it. When you change a prompt:
 
 1. Explain the failure you saw (ideally with a public PR that shows it) in the PR description.
-2. Run the CLI on the examples in `examples/` before and after, and compare the output.
+2. Run `node scripts/generate-examples.mjs --live` before and after, and compare the output.
 3. Keep the writing-style rules in sync with the README.
 
 ### Tests

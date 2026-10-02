@@ -1,0 +1,227 @@
+{
+  "title": "Wrap fetch network failures in `NetworkError` and stop retrying unknown errors",
+  "summary": "Failed `fetch` calls now reject with a new `NetworkError` instead of the runtime's raw `TypeError`. `#fetch` wraps the error only when `isRawNetworkError` recognizes its message, and keeps the original error in `cause`.\n\nThe retry rule is also narrower. `#calculateRetryDelay` now retries timeouts (with `retryOnTimeout`), listed HTTP status codes, and `NetworkError`. Any other error is thrown at once, so programming bugs no longer cause retries. Both changes alter what callers catch, and the PR updates existing tests to match.",
+  "changes": [
+    {
+      "file": "source/core/Ky.ts",
+      "what": "`#fetch` now wraps the `fetch` and `timeout` calls in `try`/`catch` and rethrows recognized network failures as `NetworkError`. `#calculateRetryDelay` returns early for timeouts and HTTP errors, retries a `NetworkError`, and throws every other error.",
+      "why": "Before, any error that was not a timeout or a filtered `HTTPError` was retried, including bugs in hooks or custom `fetch` code. Now the retry decision depends on the error type."
+    },
+    {
+      "file": "source/utils/is-network-error.ts",
+      "what": "Adds `isRawNetworkError`, inlined from `is-network-error` 1.3.1. It matches a `TypeError` by the exact message that each runtime uses for network failures, such as `Failed to fetch` and `fetch failed`.",
+      "why": "`#fetch` uses it to decide which errors become `NetworkError`. An error with any other message stays unwrapped and is no longer retried."
+    },
+    {
+      "file": "source/errors/NetworkError.ts",
+      "what": "Adds `NetworkError`, a `KyError` subclass with a `request` property and the original error in `cause`.",
+      "why": "Callers can now tell network failures apart from `HTTPError` and `TimeoutError` without matching messages."
+    },
+    {
+      "file": "source/utils/type-guards.ts",
+      "what": "Adds `isNetworkError`, which checks `instanceof NetworkError` or an error `name` of `NetworkError`. `isKyError` now also returns `true` for a `NetworkError`.",
+      "why": "The name check lets the guard work across separate copies of Ky, like the other guards."
+    },
+    {
+      "file": "source/index.ts",
+      "what": "Exports `NetworkError` and `isNetworkError`.",
+      "why": "Makes the new class and guard part of the public API."
+    },
+    {
+      "file": "source/types/options.ts",
+      "what": "Rewrites the `retry` docs: network errors are retried for retriable methods, other errors are thrown, and a long `Retry-After` is capped at `maxRetryAfter`.",
+      "why": "Removes the outdated sentence that timeouts never trigger retries."
+    },
+    {
+      "file": "source/types/retry.ts",
+      "what": "Updates the `maxRetryAfter` and `shouldRetry` docs to match the new rules.",
+      "why": "`shouldRetry` returning `undefined` now means \"retry only known error types\"."
+    },
+    {
+      "file": "source/types/hooks.ts",
+      "what": "Updates the `beforeRetry` and `beforeError` docs to name `NetworkError` and `isNetworkError`.",
+      "why": "Hooks now receive a `NetworkError` where they used to receive a raw `TypeError`."
+    },
+    {
+      "file": "test/retry.ts",
+      "what": "Adds tests: `NetworkError` wraps fetch failures, is retried by default, is not retried for `POST`, and reaches `shouldRetry` and `beforeError` with its `cause`. Also tests that a non-network `TypeError` is neither wrapped nor retried.",
+      "why": "Covers both new rules: the wrapping in `#fetch` and the retry decision in `#calculateRetryDelay`."
+    },
+    {
+      "file": "test/hooks.ts",
+      "what": "Replaces fake failures such as `new Error('simulated network failure')` with `new TypeError('Failed to fetch')`, and asserts `isNetworkError(error)`.",
+      "why": "The old fake errors are no longer retried. This shows that custom `fetch` errors with other messages lose their retries."
+    },
+    {
+      "file": "test/headers.ts",
+      "what": "Reads the Undici error code from `error.cause.cause` instead of `error.cause`.",
+      "why": "The Undici `TypeError` now sits one level deeper, inside `NetworkError`. Caller code that reads `error.cause.code` must change the same way."
+    },
+    {
+      "file": "test/memory-leak.ts",
+      "what": "Expects `NetworkError` instead of a `TypeError` with the message `fetch failed`.",
+      "why": "Follows the new error type."
+    },
+    {
+      "file": "readme.md",
+      "what": "Documents `NetworkError`, `isNetworkError`, and the new retry rules.",
+      "why": "Keeps the readme in sync with the type docs."
+    },
+    {
+      "file": "source/errors/KyError.ts",
+      "what": "Lists `NetworkError` among the subclasses in the class doc.",
+      "why": "Doc-only change."
+    },
+    {
+      "file": "source/errors/HTTPError.ts",
+      "what": "Mentions the `options` property in the class doc.",
+      "why": "Doc-only change."
+    }
+  ],
+  "flow": {
+    "caption": "A request goes through `#fetch`, which calls the configured `fetch`. A failure that `isRawNetworkError` recognizes becomes a `NetworkError`. `#calculateRetryDelay` uses `isNetworkError` to decide whether to retry.",
+    "nodes": [
+      {
+        "id": "request",
+        "label": "ky.get() and friends",
+        "kind": "entry",
+        "file": null,
+        "changed": false
+      },
+      {
+        "id": "fetch_method",
+        "label": "#fetch",
+        "kind": "function",
+        "file": "source/core/Ky.ts",
+        "changed": true
+      },
+      {
+        "id": "fetch_impl",
+        "label": "configured fetch",
+        "kind": "external",
+        "file": null,
+        "changed": false
+      },
+      {
+        "id": "raw_check",
+        "label": "isRawNetworkError",
+        "kind": "function",
+        "file": "source/utils/is-network-error.ts",
+        "changed": true
+      },
+      {
+        "id": "network_error",
+        "label": "NetworkError",
+        "kind": "module",
+        "file": "source/errors/NetworkError.ts",
+        "changed": true
+      },
+      {
+        "id": "retry_delay",
+        "label": "#calculateRetryDelay",
+        "kind": "function",
+        "file": "source/core/Ky.ts",
+        "changed": true
+      },
+      {
+        "id": "guard",
+        "label": "isNetworkError",
+        "kind": "function",
+        "file": "source/utils/type-guards.ts",
+        "changed": true
+      }
+    ],
+    "edges": [
+      {
+        "from": "request",
+        "to": "fetch_method",
+        "label": "Request"
+      },
+      {
+        "from": "fetch_method",
+        "to": "fetch_impl",
+        "label": "request and options"
+      },
+      {
+        "from": "fetch_method",
+        "to": "raw_check",
+        "label": "caught error"
+      },
+      {
+        "from": "fetch_method",
+        "to": "network_error",
+        "label": "wraps as cause"
+      },
+      {
+        "from": "network_error",
+        "to": "retry_delay",
+        "label": "rejected attempt"
+      },
+      {
+        "from": "retry_delay",
+        "to": "guard",
+        "label": "error type check"
+      },
+      {
+        "from": "retry_delay",
+        "to": "fetch_method",
+        "label": "retry after delay"
+      }
+    ]
+  },
+  "risks": [
+    {
+      "severity": "high",
+      "title": "Network failures are no longer `TypeError` instances",
+      "file": "source/core/Ky.ts",
+      "side": "new",
+      "start_line": 832,
+      "end_line": 835,
+      "reason": "`#fetch` now rethrows recognized failures as `NetworkError`, which extends `KyError`, not `TypeError`. Caller code that checks `error instanceof TypeError`, `error.message === 'Failed to fetch'`, or `error.cause.code` stops matching. The PR had to change such checks in `test/hooks.ts`, `test/headers.ts`, and `test/memory-leak.ts`. Release this as a breaking change."
+    },
+    {
+      "severity": "medium",
+      "title": "Errors from custom `fetch` implementations are no longer retried",
+      "file": "source/core/Ky.ts",
+      "side": "new",
+      "start_line": 490,
+      "end_line": 493,
+      "reason": "Line 491 throws every error that is not a `NetworkError`. `#fetch` creates a `NetworkError` only for a `TypeError` with a known message (line 833). A custom `fetch` such as `node-fetch` rejects with its own `FetchError` on `ECONNREFUSED`, so a `GET` that Ky used to retry now fails on the first attempt."
+    },
+    {
+      "severity": "low",
+      "title": "`isNetworkError` also matches the standard `DOMException` named `NetworkError`",
+      "file": "source/utils/type-guards.ts",
+      "side": "new",
+      "start_line": 75,
+      "end_line": 77,
+      "reason": "Line 76 accepts any error whose `name` is `NetworkError`. Browsers use that name for a standard `DOMException`, which has no `request` property. Code that follows the documented example and reads `error.request.url` after the guard throws a `TypeError` for such an error."
+    }
+  ],
+  "tests": [
+    {
+      "description": "In Node, request a closed local port with `ky.get(url, {retry: 2})`. Confirm it rejects with `NetworkError` after 3 attempts and that `error.cause` is Undici's `TypeError('fetch failed')`.",
+      "related_files": ["source/core/Ky.ts", "source/utils/is-network-error.ts"]
+    },
+    {
+      "description": "Pass `fetch: nodeFetch` and request a closed port. Confirm whether Ky still retries, and document the result for custom `fetch` users.",
+      "related_files": ["source/core/Ky.ts"]
+    },
+    {
+      "description": "Search the readme and changelog for an upgrade note that tells users to replace `instanceof TypeError` and `error.cause.code` checks.",
+      "related_files": ["readme.md", "source/errors/NetworkError.ts"]
+    },
+    {
+      "description": "Call `isNetworkError(new DOMException('x', 'NetworkError'))` and decide whether `true` is the intended result.",
+      "related_files": ["source/utils/type-guards.ts"]
+    },
+    {
+      "description": "Set `retry: {retryOnTimeout: true, limit: 2}` against a slow endpoint and confirm timeouts are still retried.",
+      "related_files": ["source/core/Ky.ts"]
+    },
+    {
+      "description": "Make a custom `fetch` throw `new Error('bug')` for a `GET`, and confirm Ky throws it once, without a retry.",
+      "related_files": ["source/core/Ky.ts", "test/retry.ts"]
+    }
+  ]
+}

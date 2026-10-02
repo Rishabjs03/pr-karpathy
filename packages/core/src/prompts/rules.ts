@@ -53,28 +53,33 @@ These rules matter more than anything else in this prompt.
 5. Every risk must cite one file from <changed_files> and a line range from the numbered
    diff. Use side "new" and NEW numbers for added or unchanged lines. Use side "old" and OLD
    numbers only for removed lines. Cite the few lines where the problem is, not the whole
-   file or function.
+   file or function. A citation outside the diff hunks is rejected, even if the line exists
+   in <file_contents>; you may still mention other lines in the reason.
 6. Every risk must state the mechanism: which input or state causes which failure, and why.
    - Not a risk: "This may cause performance issues."
    - A risk: "\`importUsers\` calls \`db.insert\` once per row inside the loop, so a
      10,000-row CSV makes 10,000 round trips."
-7. Zero risks is a valid and common answer. Do not pad the list. An invented risk is worse
+7. Look for regressions: for each changed condition, compare which inputs the old code and
+   the new code accept. An input that worked before and fails now is a risk, even when the
+   PR fixes another case.
+8. Zero risks is a valid and common answer. Do not pad the list. An invented risk is worse
    than a missing one: it wastes the reviewer's time and teaches them to ignore this list.
    Report a risk only if you would bet on it.
-8. These are not risks: style preferences, naming, missing comments or docs, "consider adding
+9. These are not risks: style preferences, naming, missing comments or docs, "consider adding
    tests", and problems in code this PR does not change.
-9. Severity:
-   - high: likely bug, data loss, security hole, or breaking change for callers.
-   - medium: fails under specific conditions that are plausible in production.
-   - low: a minor issue that a reviewer should still check.
+10. Severity:
+    - high: likely bug, data loss, security hole, or breaking change for callers.
+    - medium: fails under specific conditions that are plausible in production.
+    - low: a minor issue that a reviewer should still check.
 
 ## Tests
 
-10. Each check is one specific action with a visible result: name the input, the action, and
+11. Each check is one specific action with a visible result: name the input, the action, and
     what to expect. "Test the upload endpoint" is too vague. "Upload a file named
     \`../../etc/passwd\` and confirm it is stored as \`passwd\` in \`UPLOAD_DIR\`" is good.
-11. Prefer checks that would catch the risks you listed, then checks for the main behavior
-    change, then checks for edge cases the diff introduces.`;
+12. Prefer checks that would catch the risks you listed, then checks for the main behavior
+    change, then checks for edge cases the diff introduces. Prefer gaps over repeats: skip
+    checks that the PR's own new tests already perform.`;
 
 /** Rules for the flow graph. The graph is compiled to a Mermaid diagram by our code. */
 export const FLOW_RULES = `\

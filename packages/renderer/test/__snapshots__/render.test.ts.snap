@@ -55,7 +55,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
     </div>
   </header> <section class="section" id="summary" aria-labelledby="summary-title">
     <h2 id="summary-title">Summary</h2>
-    <div class="prose summary"><p>This PR adds automatic retries for webhook deliveries that fail with a 5xx status or a timeout. <code>deliverWebhook</code> now records each failed attempt in a new <code>webhook_retries</code> table. A new <code>retryWorker</code> job sends due retries again, up to 6 attempts.</p><p>Before this change, one failed request dropped the event. Customers then had to poll <code>/events</code> to recover. The PR also renames <code>http.ts</code> to <code>http-client.ts</code> and deletes the unused <code>legacy-sender.ts</code>.</p></div>
+    <div class="prose summary"><p>This PR adds automatic retries for webhook deliveries that fail with a 5xx status or a timeout. <code class="nowrap">deliverWebhook</code> now records each failed attempt in a new <code class="nowrap">webhook_retries</code> table. A new <code class="nowrap">retryWorker</code> job sends due retries again, up to 6 attempts.</p><p>Before this change, one failed request dropped the event. Customers then had to poll <code class="nowrap">/events</code> to recover. The PR also renames <code class="nowrap">http.ts</code> to <code class="nowrap">http-client.ts</code> and deletes the unused <code class="nowrap">legacy-sender.ts</code>.</p></div>
     <ul class="glance" aria-label="At a glance">
       <li>
         <a href="#changes"
@@ -97,18 +97,18 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
           ><span class="add">+48</span>
           <span class="del">−12</span></span
         >
-        <span class="change-preview"><code>deliverWebhook</code> now catches 5xx responses and timeouts and calls <code>scheduleRetry</code> with the attempt count. A new <code>computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</span>
+        <span class="change-preview"><code class="nowrap">deliverWebhook</code> now catches 5xx responses and timeouts and calls <code class="nowrap">scheduleRetry</code> with the attempt count. A new <code class="nowrap">computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd><code>deliverWebhook</code> now catches 5xx responses and timeouts and calls <code>scheduleRetry</code> with the attempt count. A new <code>computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</dd>
+                  <dd><code class="nowrap">deliverWebhook</code> now catches 5xx responses and timeouts and calls <code class="nowrap">scheduleRetry</code> with the attempt count. A new <code class="nowrap">computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>This is the core behavior change. Failed deliveries are no longer dropped. Every caller of <code>deliverWebhook</code> now gets retries without code changes.</dd>
+                        <dd>This is the core behavior change. Failed deliveries are no longer dropped. Every caller of <code class="nowrap">deliverWebhook</code> now gets retries without code changes.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-e841ceede67ed0a53d02139b96ac149576cbb22f1079accc76dd005cc6635148" rel="noopener noreferrer" target="_blank"
@@ -128,14 +128,14 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
           ><span class="add">+64</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code>webhook_retries</code> with a <code>run_at</code> time from <code>computeBackoff</code>.</span>
+        <span class="change-preview">Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code class="nowrap">webhook_retries</code> with a <code class="nowrap">run_at</code> time from <code class="nowrap">computeBackoff</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code>webhook_retries</code> with a <code>run_at</code> time from <code>computeBackoff</code>.</dd>
+                  <dd>Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code class="nowrap">webhook_retries</code> with a <code class="nowrap">run_at</code> time from <code class="nowrap">computeBackoff</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
@@ -159,14 +159,14 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
           ><span class="add">+51</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds <code>retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code>deliverWebhook</code> for each, and deletes the row on success.</span>
+        <span class="change-preview">Adds <code class="nowrap">retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code class="nowrap">deliverWebhook</code> for each, and deletes the row on success.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code>retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code>deliverWebhook</code> for each, and deletes the row on success.</dd>
+                  <dd>Adds <code class="nowrap">retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code class="nowrap">deliverWebhook</code> for each, and deletes the row on success.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
@@ -190,18 +190,18 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
           ><span class="add">+14</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Creates the <code>webhook_retries</code> table with an index on <code>run_at</code>.</span>
+        <span class="change-preview">Creates the <code class="nowrap">webhook_retries</code> table with an index on <code class="nowrap">run_at</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Creates the <code>webhook_retries</code> table with an index on <code>run_at</code>.</dd>
+                  <dd>Creates the <code class="nowrap">webhook_retries</code> table with an index on <code class="nowrap">run_at</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The worker query filters on <code>run_at</code>, so the index keeps the poll fast as the table grows.</dd>
+                        <dd>The worker query filters on <code class="nowrap">run_at</code>, so the index keeps the poll fast as the table grows.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-edf98b28c9e8044dfd757c4f0f2c2d9876dcfeff9a3345e8f1bac098401feec2" rel="noopener noreferrer" target="_blank"
@@ -252,14 +252,14 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
           ><span class="add">+0</span>
           <span class="del">−87</span></span
         >
-        <span class="change-preview">Deletes <code>sendLegacyWebhook</code>, which had no remaining callers.</span>
+        <span class="change-preview">Deletes <code class="nowrap">sendLegacyWebhook</code>, which had no remaining callers.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Deletes <code>sendLegacyWebhook</code>, which had no remaining callers.</dd>
+                  <dd>Deletes <code class="nowrap">sendLegacyWebhook</code>, which had no remaining callers.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
@@ -315,7 +315,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
                         ><span class="swatch swatch-context"></span>Unchanged context</span
                       >
                     </div>
-            <figcaption><code>deliverWebhook</code> now hands failed deliveries to <code>scheduleRetry</code>, which stores them in the <code>webhook_retries</code> table. The <code>retryWorker</code> job reads due rows and calls <code>deliverWebhook</code> again.</figcaption>
+            <figcaption><code class="nowrap">deliverWebhook</code> now hands failed deliveries to <code class="nowrap">scheduleRetry</code>, which stores them in the <code class="nowrap">webhook_retries</code> table. The <code class="nowrap">retryWorker</code> job reads due rows and calls <code class="nowrap">deliverWebhook</code> again.</figcaption>
             <details class="flow-text" data-flow-text >
     <summary>Components and connections</summary>
     <div class="flow-text-body">
@@ -426,7 +426,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
     <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-5aef16626b3384802c29623b045c935daf1ede4549d51c1889ef9abfa564c41dR18-R27" rel="noopener noreferrer" target="_blank"
         >src/jobs/retry-worker.ts:18–27 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">The query selects due rows without <code>FOR UPDATE SKIP LOCKED</code>. When two <code>retryWorker</code> instances poll at the same time, both read the same rows and call <code>deliverWebhook</code> for each one. Customers receive duplicate events.</p>
+    <p class="risk-reason">The query selects due rows without <code class="nowrap">FOR UPDATE SKIP LOCKED</code>. When two <code class="nowrap">retryWorker</code> instances poll at the same time, both read the same rows and call <code class="nowrap">deliverWebhook</code> for each one. Customers receive duplicate events.</p>
   </li><li class="risk severity-medium" id="risk-r_51c9e8">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
@@ -435,7 +435,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
     <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-e841ceede67ed0a53d02139b96ac149576cbb22f1079accc76dd005cc6635148R41-R44" rel="noopener noreferrer" target="_blank"
         >src/webhooks/deliver.ts:41–44 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">The check <code>attempt &gt; MAX_ATTEMPTS</code> runs after <code>scheduleRetry</code>, so attempt 6 still schedules attempt 7. Endpoints that are down permanently get one extra request per event.</p>
+    <p class="risk-reason">The check <code class="nowrap">attempt &gt; MAX_ATTEMPTS</code> runs after <code class="nowrap">scheduleRetry</code>, so attempt 6 still schedules attempt 7. Endpoints that are down permanently get one extra request per event.</p>
   </li><li class="risk severity-low" id="risk-r_3b1f0c">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
@@ -444,7 +444,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
     <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-c15a8f720fb13adf8a92b21adb9ad29c2169a8ffea3df727a03a5728ca164e96R12" rel="noopener noreferrer" target="_blank"
         >src/lib/http-client.ts:12 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason"><code>DEFAULT_TIMEOUT_MS</code> is now 10000, but <code>docs/webhooks.md</code> still says requests time out after 30 seconds.</p>
+    <p class="risk-reason"><code class="nowrap">DEFAULT_TIMEOUT_MS</code> is now 10000, but <code class="nowrap">docs/webhooks.md</code> still says requests time out after 30 seconds.</p>
   </li>
           </ol>
   </section> <section class="section" id="tests" aria-labelledby="tests-title">
@@ -465,7 +465,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
                     <label class="check">
                       <input type="checkbox" data-check-id="t_8d2e41" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Run two <code>retryWorker</code> processes against one database and confirm each due row is delivered once.</span>
+                      <span class="check-text">Run two <code class="nowrap">retryWorker</code> processes against one database and confirm each due row is delivered once.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="src/jobs/retry-worker.ts">retry-worker.ts</code></li>
@@ -492,7 +492,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
                     <label class="check">
                       <input type="checkbox" data-check-id="t_e6f513" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Run the migration on a copy of production data and check that the <code>run_at</code> index exists.</span>
+                      <span class="check-text">Run the migration on a copy of production data and check that the <code class="nowrap">run_at</code> index exists.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="migrations/20240611_webhook_retries.sql">20240611_webhook_retries.sql</code></li>
@@ -501,7 +501,7 @@ exports[`renderHtml > matches the snapshot of the page body 1`] = `
                     <label class="check">
                       <input type="checkbox" data-check-id="t_2b9c77" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Search the codebase for imports of <code>src/lib/http</code> to confirm nothing still uses the old path.</span>
+                      <span class="check-text">Search the codebase for imports of <code class="nowrap">src/lib/http</code> to confirm nothing still uses the old path.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="src/lib/http-client.ts">http-client.ts</code></li>

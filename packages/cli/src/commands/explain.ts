@@ -86,7 +86,10 @@ export async function explainCommand(
     onProgress: (event) => {
       if (event.type === 'start') handles.set(event.stage, logger.stage(event.message));
       else if (event.type === 'update') handles.get(event.stage)?.update(event.message);
-      else handles.get(event.stage)?.succeed(event.message);
+      else {
+        handles.get(event.stage)?.succeed(event.message);
+        handles.delete(event.stage);
+      }
     },
     onDebug: (message) => logger.debug(message),
   };
@@ -98,6 +101,7 @@ export async function explainCommand(
   try {
     result = await explain(input, explainOptions);
   } catch (error) {
+    // Only the stage that was running when the error happened is still in the map.
     for (const handle of handles.values()) handle.fail();
     throw error;
   }

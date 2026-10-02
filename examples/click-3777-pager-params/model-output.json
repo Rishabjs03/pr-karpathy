@@ -1,0 +1,132 @@
+{
+  "title": "Forward `PAGER` parameters to the temp-file pager and parse `less` flags",
+  "summary": "`_tempfilepager` now passes the parameters from `PAGER` to the pager, before the temporary file name. On Windows, `PAGER=\"less -R\"` now runs `less -R` instead of bare `less`.\n\nThe PR also replaces the substring check for raw mode in `_pipepager`. The new `_less_uses_raw_mode` splits `LESS` and the pager arguments into tokens. Only short-option clusters with an `r`, and `--raw-control-chars`, count as a raw-mode request. This removes false positives from filenames such as `requirements.txt`. It also changes the result for a `LESS` value without a dash, such as `FRX`.",
+  "changes": [
+    {
+      "file": "src/click/_termui_impl.py",
+      "what": "Adds `_less_uses_raw_mode`, which splits `LESS` with `shlex.split` and checks each option token. `_pipepager` calls it and matches the pager by `cmd_path.stem`. `_tempfilepager` takes a new `cmd_params` argument and passes it to `subprocess.call`.",
+      "why": "Color detection for `less` no longer reacts to an `r` in filenames or long-option values. Windows users keep the options they set in `PAGER`. The detection now also ignores `LESS` values without a leading dash, which `less` accepts."
+    },
+    {
+      "file": "tests/test_termui.py",
+      "what": "Adds parametrized tests for `less` detection by file stem, case-insensitive matching on Windows, raw-mode token parsing, and parameter forwarding in the temp-file pager.",
+      "why": "The cases cover filenames with `r`, long options with values, `--`, and an unparsable `LESS`. They do not cover a dashless `LESS` such as `FRX`, or short options with attached values such as `-orecord.log`."
+    },
+    {
+      "file": "CHANGES.md",
+      "what": "Adds two entries to the unreleased section: parameter forwarding in the temp-file pager, and token-based raw-mode detection.",
+      "why": "Documents the user-visible pager behavior change."
+    }
+  ],
+  "flow": {
+    "caption": "`echo_via_pager` opens a pager through `_pager_contextmanager`, which picks `_tempfilepager` on Windows and `_pipepager` elsewhere. Both now receive the `PAGER` parameters. `_pipepager` asks `_less_uses_raw_mode` whether to keep colors.",
+    "nodes": [
+      {
+        "id": "echo_via_pager",
+        "label": "echo_via_pager",
+        "kind": "entry",
+        "file": null,
+        "changed": false
+      },
+      {
+        "id": "env",
+        "label": "PAGER and LESS variables",
+        "kind": "data",
+        "file": null,
+        "changed": false
+      },
+      {
+        "id": "pager_cm",
+        "label": "_pager_contextmanager",
+        "kind": "function",
+        "file": "src/click/_termui_impl.py",
+        "changed": true
+      },
+      {
+        "id": "pipepager",
+        "label": "_pipepager",
+        "kind": "function",
+        "file": "src/click/_termui_impl.py",
+        "changed": true
+      },
+      {
+        "id": "tempfilepager",
+        "label": "_tempfilepager",
+        "kind": "function",
+        "file": "src/click/_termui_impl.py",
+        "changed": true
+      },
+      {
+        "id": "raw_mode",
+        "label": "_less_uses_raw_mode",
+        "kind": "function",
+        "file": "src/click/_termui_impl.py",
+        "changed": true
+      },
+      {
+        "id": "pager_process",
+        "label": "less or more process",
+        "kind": "external",
+        "file": null,
+        "changed": false
+      }
+    ],
+    "edges": [
+      { "from": "echo_via_pager", "to": "pager_cm", "label": "color setting" },
+      { "from": "env", "to": "pager_cm", "label": "PAGER command" },
+      { "from": "pager_cm", "to": "pipepager", "label": "cmd_path, cmd_params" },
+      { "from": "pager_cm", "to": "tempfilepager", "label": "cmd_path, cmd_params on Windows" },
+      { "from": "env", "to": "raw_mode", "label": "LESS value" },
+      { "from": "pipepager", "to": "raw_mode", "label": "cmd_params" },
+      { "from": "pipepager", "to": "pager_process", "label": "text on stdin" },
+      { "from": "tempfilepager", "to": "pager_process", "label": "params and temp file" }
+    ]
+  },
+  "risks": [
+    {
+      "severity": "medium",
+      "title": "A dashless `LESS` value such as `FRX` no longer keeps colors",
+      "file": "src/click/_termui_impl.py",
+      "side": "new",
+      "start_line": 537,
+      "end_line": 545,
+      "reason": "`_less_uses_raw_mode` reads only tokens that start with `-`, so `LESS=FRX` returns `False` at line 545. `less` accepts dashless option strings, and `FRX` is a common value (it is Git's default). Line 582 then skips the `LESS=-R` injection because `LESS` is set, and `get_pager_file` strips all ANSI styling. The old substring check found the `R` and kept colors."
+    },
+    {
+      "severity": "low",
+      "title": "An `r` in an attached option value turns on colors",
+      "file": "src/click/_termui_impl.py",
+      "side": "new",
+      "start_line": 541,
+      "end_line": 543,
+      "reason": "Line 542 treats any `r` after the first dash as a raw-mode flag. `less` options such as `-o`, `-k`, and `-P` take an attached value, so `LESS=-orecord.log` returns `True`. Click then keeps the ANSI codes, but `less` is not in raw mode and shows them as `ESC[` text."
+    },
+    {
+      "severity": "low",
+      "title": "The Windows temp-file pager still drops colors",
+      "file": "src/click/_termui_impl.py",
+      "side": "new",
+      "start_line": 657,
+      "end_line": 660,
+      "reason": "`_tempfilepager` yields `color` unchanged at line 657, so automatic detection stays `None`. `get_pager_file` treats `None` as no color and strips ANSI codes before they reach the file. `PAGER=\"less -R\"` now reaches `less` at line 660, but styled output still shows plain unless the caller passes `color=True`."
+    }
+  ],
+  "tests": [
+    {
+      "description": "Run a Click command that calls `echo_via_pager` with styled text and `LESS=FRX`. Check whether colors still show; before this PR they did.",
+      "related_files": ["src/click/_termui_impl.py"]
+    },
+    {
+      "description": "Set `LESS=-orecord.log`, page styled text, and confirm that `less` does not show raw `ESC[` sequences.",
+      "related_files": ["src/click/_termui_impl.py"]
+    },
+    {
+      "description": "On Windows, set `PAGER=\"less -R\"`, page styled text, and confirm that `less` receives `-R`. Then check whether the colors appear.",
+      "related_files": ["src/click/_termui_impl.py", "tests/test_termui.py"]
+    },
+    {
+      "description": "On Linux, set `PAGER=\"less -X\"` with `LESS` unset. Confirm the pager starts with `-X` and that no `LESS=-R` is injected.",
+      "related_files": ["src/click/_termui_impl.py"]
+    }
+  ]
+}

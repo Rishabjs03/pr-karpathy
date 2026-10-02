@@ -1,0 +1,141 @@
+diff --git a/readme.md b/readme.md
+index 46d7680..a37a55c 100644
+--- a/readme.md
++++ b/readme.md
+@@ -1012,6 +1012,8 @@ const response = await api.get('version');
+ 
+ By default, `.extend()` deep-merges options: hooks are appended, headers are merged, and search parameters are accumulated. Use [`replaceOption`](#replaceoption) when you want to fully replace a merged property instead.
+ 
++When extending an instance, signals are combined. Use `replaceOption(signal)` to replace inherited signals, or `signal: undefined` to remove them.
++
+ ```js
+ import ky, {replaceOption} from 'ky';
+ 
+diff --git a/source/types/ky.ts b/source/types/ky.ts
+index dfb03d0..4732501 100644
+--- a/source/types/ky.ts
++++ b/source/types/ky.ts
+@@ -97,6 +97,8 @@ export type KyInstance = {
+ 
+ 	By default, `.extend()` deep-merges options: hooks are appended, headers are merged, and search parameters are accumulated. Use `replaceOption` when you want to fully replace a merged property instead.
+ 
++	When extending an instance, signals are combined. Use `replaceOption(signal)` to replace inherited signals, or `signal: undefined` to remove them.
++
+ 	You can also refer to parent defaults by providing a function to `.extend()`.
+ 
+ 	@example
+diff --git a/source/utils/merge.ts b/source/utils/merge.ts
+index aa046c4..922f017 100644
+--- a/source/utils/merge.ts
++++ b/source/utils/merge.ts
+@@ -220,16 +220,21 @@ const deepMergeInternal = <T>(isRoot: boolean, ...sources: Array<Partial<T> | un
+ 			returnValue = [...returnValue, ...source];
+ 		} else if (isObject(source)) {
+ 			for (let [key, value] of Object.entries(source)) {
+-				// Special handling for AbortSignal instances
+-				if (key === 'signal' && value instanceof globalThis.AbortSignal) {
+-					signals.push(value);
+-					continue;
+-				}
+-
+ 				const replaceState = getReplaceState(value);
+ 				const {isReplace} = replaceState;
+ 				value = replaceState.value;
+ 
++				const isRootSignal = isRoot && key === 'signal';
++				if (isRootSignal && (isReplace || value === undefined)) {
++					signals.length = 0;
++				}
++
++				// Special handling for AbortSignal instances at the root options level
++				if (isRootSignal && value instanceof globalThis.AbortSignal) {
++					signals.push(value);
++					continue;
++				}
++
+ 				// Special handling for context - shallow merge only
+ 				if (key === 'context') {
+ 					if (value !== undefined && value !== null && (!isObject(value) || Array.isArray(value))) {
+@@ -312,7 +317,7 @@ const deepMergeInternal = <T>(isRoot: boolean, ...sources: Array<Partial<T> | un
+ 		} else {
+ 			// When AbortSignal.any is not available, use the last signal
+ 			// This maintains the previous behavior before signal merging was added
+-			// This can be remove when the `supportsAbortSignal` check is removed.`
++			// This can be removed when the `supportsAbortSignal` check is removed.
+ 			returnValue.signal = signals.at(-1);
+ 		}
+ 	}
+diff --git a/test/main.ts b/test/main.ts
+index b6ceb7a..cb3209b 100644
+--- a/test/main.ts
++++ b/test/main.ts
+@@ -2540,6 +2540,69 @@ test('merges signals from instance and request options', async t => {
+ 	const error = (await t.throwsAsync(response))!;
+ 	t.true(['DOMException', 'Error'].includes(error.constructor.name));
+ 	t.is(error.name, 'AbortError');
++
++	const freshRequestController = new AbortController();
++	const instanceResponse = instance.get(server.url, {
++		signal: freshRequestController.signal,
++	});
++
++	instanceController.abort();
++
++	const instanceError = (await t.throwsAsync(instanceResponse))!;
++	t.true(['DOMException', 'Error'].includes(instanceError.constructor.name));
++	t.is(instanceError.name, 'AbortError');
++});
++
++test('ky.extend() with replaceOption replaces signal instead of merging', async t => {
++	const server = await createHttpTestServer(t);
++	server.get('/', (_request, response) => {
++		response.end('success');
++	});
++
++	const parentController = new AbortController();
++	const replacementController = new AbortController();
++	const base = ky.create({signal: parentController.signal});
++	const extended = base.extend({signal: replaceOption(replacementController.signal)});
++
++	parentController.abort();
++	t.is(await extended(server.url).text(), 'success');
++
++	replacementController.abort();
++	const error = (await t.throwsAsync(extended(server.url)))!;
++	t.is(error.name, 'AbortError');
++});
++
++test('ky.extend() with signal set to undefined removes parent signal', async t => {
++	const server = await createHttpTestServer(t);
++	server.get('/', (_request, response) => {
++		response.end('success');
++	});
++
++	const parentController = new AbortController();
++	const base = ky.create({signal: parentController.signal});
++	const extended = base.extend({signal: undefined});
++
++	parentController.abort();
++	t.is(await extended(server.url).text(), 'success');
++
++	const requestController = new AbortController();
++	requestController.abort();
++	const error = (await t.throwsAsync(extended(server.url, {signal: requestController.signal})))!;
++	t.is(error.name, 'AbortError');
++});
++
++test('signal option handling does not affect nested JSON properties', async t => {
++	const server = await createHttpTestServer(t);
++	server.post('/', (request, response) => {
++		response.json(request.body);
++	});
++
++	const nestedController = new AbortController();
++	const base = ky.create({json: {unicorn: true, signal: nestedController.signal}});
++	const extended = base.extend({json: {signal: undefined}});
++
++	const result = await extended.post(server.url).json();
++	t.deepEqual(result, {unicorn: true});
+ });
+ 
+ test('supports Request instance as input', async t => {

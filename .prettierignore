@@ -8,3 +8,7 @@ fixtures/**/*.diff
 fixtures/**/*.patch
 .changeset/*.md
 CHANGELOG.md
+# Written by scripts (generate-examples.mjs, update-sample-flow.mjs) with JSON.stringify.
+examples/**/*.json
+examples/**/*.diff
+fixtures/*.json

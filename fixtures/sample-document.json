@@ -166,7 +166,10 @@
       "title": "Docs still describe the old 30 second timeout",
       "file": "src/lib/http-client.ts",
       "side": "new",
-      "lines": [12, 12],
+      "lines": [
+        12,
+        12
+      ],
       "reason": "`DEFAULT_TIMEOUT_MS` is now 10000, but `docs/webhooks.md` still says requests time out after 30 seconds."
     },
     {
@@ -175,7 +178,10 @@
       "title": "Two workers can send the same retry twice",
       "file": "src/jobs/retry-worker.ts",
       "side": "new",
-      "lines": [18, 27],
+      "lines": [
+        18,
+        27
+      ],
       "reason": "The query selects due rows without `FOR UPDATE SKIP LOCKED`. When two `retryWorker` instances poll at the same time, both read the same rows and call `deliverWebhook` for each one. Customers receive duplicate events."
     },
     {
@@ -184,7 +190,10 @@
       "title": "Retries continue after the maximum attempt count",
       "file": "src/webhooks/deliver.ts",
       "side": "new",
-      "lines": [41, 44],
+      "lines": [
+        41,
+        44
+      ],
       "reason": "The check `attempt > MAX_ATTEMPTS` runs after `scheduleRetry`, so attempt 6 still schedules attempt 7. Endpoints that are down permanently get one extra request per event."
     }
   ],
@@ -192,27 +201,38 @@
     {
       "id": "t_8d2e41",
       "description": "Run two `retryWorker` processes against one database and confirm each due row is delivered once.",
-      "related_files": ["src/jobs/retry-worker.ts"]
+      "related_files": [
+        "src/jobs/retry-worker.ts"
+      ]
     },
     {
       "id": "t_17aa30",
       "description": "Point a webhook at an endpoint that returns 503 and confirm retries happen at 30s, 60s, 120s, and stop after attempt 6.",
-      "related_files": ["src/webhooks/deliver.ts", "src/webhooks/retry-queue.ts"]
+      "related_files": [
+        "src/webhooks/deliver.ts",
+        "src/webhooks/retry-queue.ts"
+      ]
     },
     {
       "id": "t_c40b92",
       "description": "Confirm that a 4xx response does not schedule a retry.",
-      "related_files": ["src/webhooks/deliver.ts"]
+      "related_files": [
+        "src/webhooks/deliver.ts"
+      ]
     },
     {
       "id": "t_e6f513",
       "description": "Run the migration on a copy of production data and check that the `run_at` index exists.",
-      "related_files": ["migrations/20240611_webhook_retries.sql"]
+      "related_files": [
+        "migrations/20240611_webhook_retries.sql"
+      ]
     },
     {
       "id": "t_2b9c77",
       "description": "Search the codebase for imports of `src/lib/http` to confirm nothing still uses the old path.",
-      "related_files": ["src/lib/http-client.ts"]
+      "related_files": [
+        "src/lib/http-client.ts"
+      ]
     }
   ],
   "skipped_files": [
