@@ -1,0 +1,44 @@
+{
+  "name": "@lucidiff/renderer",
+  "version": "0.1.0",
+  "description": "Renders a lucidiff explainer document into a single self-contained HTML file.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishabjs03/pr-karpathy.git",
+    "directory": "packages/renderer"
+  },
+  "keywords": [
+    "pull-request",
+    "code-review",
+    "html",
+    "renderer"
+  ],
+  "dependencies": {
+    "@lucidiff/core": "workspace:*"
+  },
+  "devDependencies": {
+    "mermaid": "12.1.0"
+  }
+}

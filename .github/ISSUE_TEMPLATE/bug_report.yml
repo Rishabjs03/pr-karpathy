@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not paste private code, API keys, or tokens.
+        If the bug is a security issue, follow SECURITY.md instead of opening an issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, and what happened instead?
+      placeholder: |
+        I ran `lucidiff https://github.com/owner/repo/pull/1 --open` and expected …, but …
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: A public PR URL or a small diff that shows the problem helps the most.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste the output of the command with `--verbose`. Remove anything private first.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: lucidiff version
+      description: Output of `lucidiff --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version, provider, and model.
+      placeholder: macOS 15, Node 22.12, anthropic / claude-opus-5-5
+    validations:
+      required: true

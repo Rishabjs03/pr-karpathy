@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+# Local CLI output (examples/ is committed on purpose)
+/review.html
+/*.explainer.html
+/*.explainer.json
+.vitest-cache/
+.sample/

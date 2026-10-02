@@ -1,0 +1,65 @@
+{
+  "name": "@lucidiff/core",
+  "version": "0.1.0",
+  "description": "Pipeline, schema, and LLM layer for lucidiff: turn a pull request into a validated, structured explanation.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema": {
+      "source": "./src/schema/index.ts",
+      "types": "./dist/schema/index.d.ts",
+      "import": "./dist/schema/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishabjs03/pr-karpathy.git",
+    "directory": "packages/core"
+  },
+  "keywords": [
+    "pull-request",
+    "code-review",
+    "diff",
+    "llm",
+    "explainer"
+  ],
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.71",
+    "@ai-sdk/gateway": "^4.0.103",
+    "@ai-sdk/openai": "^4.0.83",
+    "@octokit/rest": "^22.0.1",
+    "ai": "^7.0.127",
+    "picomatch": "^4.0.7",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3",
+    "mermaid": "12.1.0"
+  },
+  "peerDependencies": {
+    "mermaid": ">=11"
+  },
+  "peerDependenciesMeta": {
+    "mermaid": {
+      "optional": true
+    }
+  }
+}

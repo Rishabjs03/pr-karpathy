@@ -1,0 +1,560 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderHtml > matches the snapshot of the page body 1`] = `
+"<div class="topbar" role="banner">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="Back to top">
+        <span class="brand-mark" aria-hidden="true"></span>lucidiff
+      </a>
+      <nav class="section-nav" aria-label="Sections">
+        <ul>
+          <li>
+                <a href="#summary" data-nav="summary"
+                  >Summary</a
+                >
+              </li><li>
+                <a href="#changes" data-nav="changes"
+                  >Changes<span class="nav-count">7</span></a
+                >
+              </li><li>
+                <a href="#flow" data-nav="flow"
+                  >Flow</a
+                >
+              </li><li>
+                <a href="#risks" data-nav="risks"
+                  >Risks<span class="nav-count">3</span></a
+                >
+              </li><li>
+                <a href="#tests" data-nav="tests"
+                  >Tests<span class="nav-count">5</span></a
+                >
+              </li>
+        </ul>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle color theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg><svg class="icon icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+    <main id="main" class="container">
+      <header class="hero" id="top">
+    <p class="eyebrow"><a href="https://github.com/acme/notifier/pull/482" rel="noopener noreferrer" target="_blank"
+        >acme/notifier#482 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      ></p>
+    <h1>Retry failed webhook deliveries with exponential backoff</h1>
+    <div class="hero-meta">
+      <span class="chip mono" title="Head branch into base branch"
+          ><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v6M18 9a9 9 0 0 1-9 9"/></svg>feat/webhook-retries → main</span
+        >
+      <span>9 files changed</span>
+      <span class="mono diffstat"
+        ><span class="add">+189</span>
+        <span class="del">−103</span></span
+      >
+      <span>by octocat</span>
+    </div>
+  </header> <section class="section" id="summary" aria-labelledby="summary-title">
+    <h2 id="summary-title">Summary</h2>
+    <div class="prose summary"><p>This PR adds automatic retries for webhook deliveries that fail with a 5xx status or a timeout. <code>deliverWebhook</code> now records each failed attempt in a new <code>webhook_retries</code> table. A new <code>retryWorker</code> job sends due retries again, up to 6 attempts.</p><p>Before this change, one failed request dropped the event. Customers then had to poll <code>/events</code> to recover. The PR also renames <code>http.ts</code> to <code>http-client.ts</code> and deletes the unused <code>legacy-sender.ts</code>.</p></div>
+    <ul class="glance" aria-label="At a glance">
+      <li>
+        <a href="#changes"
+          ><span class="glance-value">7 files</span
+          ><span class="glance-label">explained</span></a
+        >
+      </li>
+      <li>
+        <a href="#risks" class="glance-high"
+          ><span class="glance-value">3 risks</span
+          ><span class="glance-label">1 high</span></a
+        >
+      </li>
+      <li>
+        <a href="#tests"
+          ><span class="glance-value">5 checks</span
+          ><span class="glance-label">to verify</span></a
+        >
+      </li>
+    </ul>
+  </section> <section class="section" id="changes" aria-labelledby="changes-title">
+    <div class="section-head">
+      <h2 id="changes-title">Changes</h2>
+      <div class="section-tools">
+              <button type="button" class="text-button" data-expand="all">Expand all</button>
+              <button type="button" class="text-button" data-expand="none">Collapse all</button>
+            </div>
+    </div>
+    <ul class="change-list">
+            <li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="src/webhooks/deliver.ts"
+    ><span class="path-dir">src/webhooks/</span><span class="path-base">deliver.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+48</span>
+          <span class="del">−12</span></span
+        >
+        <span class="change-preview"><code>deliverWebhook</code> now catches 5xx responses and timeouts and calls <code>scheduleRetry</code> with the attempt count. A new <code>computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd><code>deliverWebhook</code> now catches 5xx responses and timeouts and calls <code>scheduleRetry</code> with the attempt count. A new <code>computeBackoff(attempt)</code> returns the delay: 30 seconds doubled per attempt, capped at 1 hour.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>This is the core behavior change. Failed deliveries are no longer dropped. Every caller of <code>deliverWebhook</code> now gets retries without code changes.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-e841ceede67ed0a53d02139b96ac149576cbb22f1079accc76dd005cc6635148" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-added">Added</span>
+        <span class="path mono" title="src/webhooks/retry-queue.ts"
+    ><span class="path-dir">src/webhooks/</span><span class="path-base">retry-queue.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+64</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code>webhook_retries</code> with a <code>run_at</code> time from <code>computeBackoff</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds <code>scheduleRetry(event, attempt)</code>, which inserts a row into <code>webhook_retries</code> with a <code>run_at</code> time from <code>computeBackoff</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Storing retries in the database keeps them across deploys and restarts.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-9a81b25194b0ceda41c3f833e016ccdd0e6777b40e65f5d299fb085c7b25e921" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-added">Added</span>
+        <span class="path mono" title="src/jobs/retry-worker.ts"
+    ><span class="path-dir">src/jobs/</span><span class="path-base">retry-worker.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+51</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Adds <code>retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code>deliverWebhook</code> for each, and deletes the row on success.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds <code>retryWorker</code>, a job that runs every 30 seconds. It selects up to 100 due rows, calls <code>deliverWebhook</code> for each, and deletes the row on success.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>This job is the only code that sends retries, so its batch size and locking decide retry throughput.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-5aef16626b3384802c29623b045c935daf1ede4549d51c1889ef9abfa564c41d" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-added">Added</span>
+        <span class="path mono" title="migrations/20240611_webhook_retries.sql"
+    ><span class="path-dir">migrations/</span><span class="path-base">20240611_webhook_retries.sql</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+14</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Creates the <code>webhook_retries</code> table with an index on <code>run_at</code>.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Creates the <code>webhook_retries</code> table with an index on <code>run_at</code>.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>The worker query filters on <code>run_at</code>, so the index keeps the poll fast as the table grows.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-edf98b28c9e8044dfd757c4f0f2c2d9876dcfeff9a3345e8f1bac098401feec2" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-renamed">Renamed</span>
+        <span class="path mono" title="src/lib/http-client.ts"
+    ><span class="path-dir">src/lib/</span><span class="path-base">http-client.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+3</span>
+          <span class="del">−3</span></span
+        >
+        <span class="change-preview">Renames the file and changes the default request timeout from 30 seconds to 10 seconds.</span>
+      </summary>
+      <div class="change-body">
+        <p class="renamed-from">Renamed from <code>src/lib/http.ts</code></p>
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Renames the file and changes the default request timeout from 30 seconds to 10 seconds.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>A shorter timeout frees workers sooner. It also counts more slow endpoints as failures, which now trigger retries.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-c15a8f720fb13adf8a92b21adb9ad29c2169a8ffea3df727a03a5728ca164e96" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-deleted">Deleted</span>
+        <span class="path mono" title="src/webhooks/legacy-sender.ts"
+    ><span class="path-dir">src/webhooks/</span><span class="path-base">legacy-sender.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+0</span>
+          <span class="del">−87</span></span
+        >
+        <span class="change-preview">Deletes <code>sendLegacyWebhook</code>, which had no remaining callers.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Deletes <code>sendLegacyWebhook</code>, which had no remaining callers.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Removes dead code. Nothing in the repository imports it.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-272f82b0e613ea35dd1647ad7739491e6e782162d2c8758145e1238c7d7ec999" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="docs/webhooks.md"
+    ><span class="path-dir">docs/</span><span class="path-base">webhooks.md</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+9</span>
+          <span class="del">−1</span></span
+        >
+        
+      </summary>
+      <div class="change-body">
+        
+        <p class="muted">The model did not describe this file. Review it directly.</p>
+        <a class="file-link" href="https://github.com/acme/notifier/pull/482/files#diff-9e6a582601a54be0e321add0b96361303ccf3d471b1d6350daf364c6b96a6667" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li>
+          </ul>
+  </section> <section class="section" id="flow" aria-labelledby="flow-title">
+    <h2 id="flow-title">Flow</h2>
+    <figure class="flow card">
+            <div
+                      class="flow-diagram"
+                      data-flow-diagram
+                      data-state="loading"
+                      role="img"
+                      aria-label="\`deliverWebhook\` now hands failed deliveries to \`scheduleRetry\`, which stores them in the \`webhook_retries\` table. The \`retryWorker\` job reads due rows and calls \`deliverWebhook\` again."
+                    >
+                      <p class="flow-status muted" data-flow-status>Rendering diagram…</p>
+                    </div>
+                    <div class="flow-legend" aria-hidden="true">
+                      <span class="legend-item"
+                        ><span class="swatch swatch-changed"></span>Changed in this PR</span
+                      >
+                      <span class="legend-item"
+                        ><span class="swatch swatch-context"></span>Unchanged context</span
+                      >
+                    </div>
+            <figcaption><code>deliverWebhook</code> now hands failed deliveries to <code>scheduleRetry</code>, which stores them in the <code>webhook_retries</code> table. The <code>retryWorker</code> job reads due rows and calls <code>deliverWebhook</code> again.</figcaption>
+            <details class="flow-text" data-flow-text >
+    <summary>Components and connections</summary>
+    <div class="flow-text-body">
+      <div>
+        <h3>Components</h3>
+        <ul>
+          <li>
+                <span class="flow-node-name "
+                  >POST /events</span
+                >
+                <span class="muted"
+                  >entry point</span
+                >
+                
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >deliverWebhook</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>src/webhooks/deliver.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >computeBackoff</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>src/webhooks/deliver.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >scheduleRetry</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>src/webhooks/retry-queue.ts</code>
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >webhook_retries table</span
+                >
+                <span class="muted"
+                  >data, changed</span
+                >
+                
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >retryWorker</span
+                >
+                <span class="muted"
+                  >module, changed</span
+                >
+                <code>src/jobs/retry-worker.ts</code>
+              </li><li>
+                <span class="flow-node-name "
+                  >Customer endpoint</span
+                >
+                <span class="muted"
+                  >external service</span
+                >
+                
+              </li>
+        </ul>
+      </div>
+      <div>
+        <h3>Connections</h3>
+        <ul>
+                <li>
+                      POST /events → deliverWebhook
+                      <span class="muted">(event payload)</span>
+                    </li><li>
+                      deliverWebhook → Customer endpoint
+                      <span class="muted">(HTTPS POST)</span>
+                    </li><li>
+                      deliverWebhook → computeBackoff
+                      <span class="muted">(attempt count)</span>
+                    </li><li>
+                      deliverWebhook → scheduleRetry
+                      <span class="muted">(on 5xx or timeout)</span>
+                    </li><li>
+                      scheduleRetry → webhook_retries table
+                      <span class="muted">(insert row)</span>
+                    </li><li>
+                      retryWorker → webhook_retries table
+                      <span class="muted">(poll due rows)</span>
+                    </li><li>
+                      retryWorker → deliverWebhook
+                      <span class="muted">(retry)</span>
+                    </li>
+              </ul>
+      </div>
+    </div>
+  </details>
+          </figure>
+  </section>
+      <section class="section" id="risks" aria-labelledby="risks-title">
+    <div class="section-head">
+      <h2 id="risks-title">Risks</h2>
+      <p class="section-note">1 high · 1 medium · 1 low</p>
+    </div>
+    <ol class="risk-list">
+            <li class="risk severity-high" id="risk-r_9a42d7">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>High</span>
+      <h3 class="risk-title">Two workers can send the same retry twice</h3>
+    </div>
+    <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-5aef16626b3384802c29623b045c935daf1ede4549d51c1889ef9abfa564c41dR18-R27" rel="noopener noreferrer" target="_blank"
+        >src/jobs/retry-worker.ts:18–27 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason">The query selects due rows without <code>FOR UPDATE SKIP LOCKED</code>. When two <code>retryWorker</code> instances poll at the same time, both read the same rows and call <code>deliverWebhook</code> for each one. Customers receive duplicate events.</p>
+  </li><li class="risk severity-medium" id="risk-r_51c9e8">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
+      <h3 class="risk-title">Retries continue after the maximum attempt count</h3>
+    </div>
+    <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-e841ceede67ed0a53d02139b96ac149576cbb22f1079accc76dd005cc6635148R41-R44" rel="noopener noreferrer" target="_blank"
+        >src/webhooks/deliver.ts:41–44 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason">The check <code>attempt &gt; MAX_ATTEMPTS</code> runs after <code>scheduleRetry</code>, so attempt 6 still schedules attempt 7. Endpoints that are down permanently get one extra request per event.</p>
+  </li><li class="risk severity-low" id="risk-r_3b1f0c">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
+      <h3 class="risk-title">Docs still describe the old 30 second timeout</h3>
+    </div>
+    <a class="location mono" href="https://github.com/acme/notifier/pull/482/files#diff-c15a8f720fb13adf8a92b21adb9ad29c2169a8ffea3df727a03a5728ca164e96R12" rel="noopener noreferrer" target="_blank"
+        >src/lib/http-client.ts:12 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason"><code>DEFAULT_TIMEOUT_MS</code> is now 10000, but <code>docs/webhooks.md</code> still says requests time out after 30 seconds.</p>
+  </li>
+          </ol>
+  </section> <section class="section" id="tests" aria-labelledby="tests-title">
+    <div class="section-head">
+      <h2 id="tests-title">Test checklist</h2>
+      <div class="section-tools">
+              <span class="section-note" data-check-progress aria-live="polite"
+                >0 of 5 done</span
+              >
+              <button type="button" class="text-button" data-check-reset>Reset</button>
+            </div>
+    </div>
+    <div class="progress" aria-hidden="true">
+              <span class="progress-bar" data-check-bar></span>
+            </div>
+            <ul class="checklist">
+              <li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_8d2e41" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Run two <code>retryWorker</code> processes against one database and confirm each due row is delivered once.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="src/jobs/retry-worker.ts">retry-worker.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_17aa30" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Point a webhook at an endpoint that returns 503 and confirm retries happen at 30s, 60s, 120s, and stop after attempt 6.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="src/webhooks/deliver.ts">deliver.ts</code></li><li><code title="src/webhooks/retry-queue.ts">retry-queue.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_c40b92" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Confirm that a 4xx response does not schedule a retry.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="src/webhooks/deliver.ts">deliver.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_e6f513" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Run the migration on a copy of production data and check that the <code>run_at</code> index exists.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="migrations/20240611_webhook_retries.sql">20240611_webhook_retries.sql</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_2b9c77" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Search the codebase for imports of <code>src/lib/http</code> to confirm nothing still uses the old path.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="src/lib/http-client.ts">http-client.ts</code></li>
+                          </ul>
+                  </li>
+            </ul>
+  </section> <footer class="footer">
+    <div class="disclaimer" role="note">
+      <strong>AI-generated.</strong> A language model wrote this explainer from the diff. It can be
+      wrong or incomplete. Use it to guide your review. It does not replace reading the code.
+    </div>
+    <dl class="meta-grid">
+      <div>
+            <dt>Model</dt>
+            <dd><code>claude-opus-5-5</code></dd>
+          </div><div>
+            <dt>Provider</dt>
+            <dd>anthropic</dd>
+          </div><div>
+            <dt>Generated</dt>
+            <dd><time datetime="2026-10-02T12:00:00.000Z">2026-10-02 12:00 UTC</time></dd>
+          </div><div>
+            <dt>Analysis</dt>
+            <dd>1 model call</dd>
+          </div><div>
+            <dt>Tokens</dt>
+            <dd>18,452 in · 2,210 out</dd>
+          </div><div>
+            <dt>Files analyzed</dt>
+            <dd>7 of 9</dd>
+          </div><div>
+            <dt>Secrets redacted</dt>
+            <dd>1</dd>
+          </div><div>
+            <dt>Risks dropped</dt>
+            <dd>1 (invalid citation)</dd>
+          </div>
+    </dl>
+    <details class="skipped">
+            <summary>2 files not sent to the model</summary>
+            <ul>
+              <li>
+                    <code>pnpm-lock.yaml</code>
+                    <span class="muted">ignore list</span>
+                  </li><li>
+                    <code>docs/retry-diagram.png</code>
+                    <span class="muted">binary file</span>
+                  </li>
+            </ul>
+          </details>
+    <p class="colophon">
+      Generated by lucidiff 0.1.0 · schema v1
+    </p>
+  </footer>
+    </main>"
+`;

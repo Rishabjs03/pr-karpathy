@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["scripts", "vitest.config.ts", "eslint.config.js", "tsup.shared.ts"]
+}

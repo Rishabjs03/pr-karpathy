@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+examples/**/*.html
+**/__snapshots__/**
+fixtures/**/*.diff
+fixtures/**/*.patch
+.changeset/*.md
+CHANGELOG.md

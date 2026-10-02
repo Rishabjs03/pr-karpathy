@@ -1,0 +1,45 @@
+{
+  "name": "lucidiff",
+  "version": "0.1.0",
+  "description": "Turn a pull request into a self-contained, interactive HTML explainer.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "lucidiff": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishabjs03/pr-karpathy.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "pull-request",
+    "code-review",
+    "cli",
+    "llm",
+    "explainer"
+  ],
+  "dependencies": {
+    "@lucidiff/core": "workspace:*",
+    "@lucidiff/renderer": "workspace:*",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1"
+  }
+}

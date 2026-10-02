@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "title": "Retry failed webhook deliveries with exponential backoff",
+  "summary": "This PR adds automatic retries for webhook deliveries that fail with a 5xx status or a timeout. `deliverWebhook` now records each failed attempt in a new `webhook_retries` table. A new `retryWorker` job sends due retries again, up to 6 attempts.\n\nBefore this change, one failed request dropped the event. Customers then had to poll `/events` to recover. The PR also renames `http.ts` to `http-client.ts` and deletes the unused `legacy-sender.ts`.",
+  "changes": [
+    {
+      "file": "src/webhooks/deliver.ts",
+      "old_file": null,
+      "kind": "modified",
+      "additions": 48,
+      "deletions": 12,
+      "what": "`deliverWebhook` now catches 5xx responses and timeouts and calls `scheduleRetry` with the attempt count. A new `computeBackoff(attempt)` returns the delay: 30 seconds doubled per attempt, capped at 1 hour.",
+      "why": "This is the core behavior change. Failed deliveries are no longer dropped. Every caller of `deliverWebhook` now gets retries without code changes."
+    },
+    {
+      "file": "src/webhooks/retry-queue.ts",
+      "old_file": null,
+      "kind": "added",
+      "additions": 64,
+      "deletions": 0,
+      "what": "Adds `scheduleRetry(event, attempt)`, which inserts a row into `webhook_retries` with a `run_at` time from `computeBackoff`.",
+      "why": "Storing retries in the database keeps them across deploys and restarts."
+    },
+    {
+      "file": "src/jobs/retry-worker.ts",
+      "old_file": null,
+      "kind": "added",
+      "additions": 51,
+      "deletions": 0,
+      "what": "Adds `retryWorker`, a job that runs every 30 seconds. It selects up to 100 due rows, calls `deliverWebhook` for each, and deletes the row on success.",
+      "why": "This job is the only code that sends retries, so its batch size and locking decide retry throughput."
+    },
+    {
+      "file": "migrations/20240611_webhook_retries.sql",
+      "old_file": null,
+      "kind": "added",
+      "additions": 14,
+      "deletions": 0,
+      "what": "Creates the `webhook_retries` table with an index on `run_at`.",
+      "why": "The worker query filters on `run_at`, so the index keeps the poll fast as the table grows."
+    },
+    {
+      "file": "src/lib/http-client.ts",
+      "old_file": "src/lib/http.ts",
+      "kind": "renamed",
+      "additions": 3,
+      "deletions": 3,
+      "what": "Renames the file and changes the default request timeout from 30 seconds to 10 seconds.",
+      "why": "A shorter timeout frees workers sooner. It also counts more slow endpoints as failures, which now trigger retries."
+    },
+    {
+      "file": "src/webhooks/legacy-sender.ts",
+      "old_file": null,
+      "kind": "deleted",
+      "additions": 0,
+      "deletions": 87,
+      "what": "Deletes `sendLegacyWebhook`, which had no remaining callers.",
+      "why": "Removes dead code. Nothing in the repository imports it."
+    },
+    {
+      "file": "docs/webhooks.md",
+      "old_file": null,
+      "kind": "modified",
+      "additions": 9,
+      "deletions": 1,
+      "what": null,
+      "why": null
+    }
+  ],
+  "flow": {
+    "caption": "`deliverWebhook` now hands failed deliveries to `scheduleRetry`, which stores them in the `webhook_retries` table. The `retryWorker` job reads due rows and calls `deliverWebhook` again.",
+    "nodes": [
+      {
+        "id": "api",
+        "label": "POST /events",
+        "kind": "entry",
+        "file": null,
+        "changed": false
+      },
+      {
+        "id": "deliver",
+        "label": "deliverWebhook",
+        "kind": "function",
+        "file": "src/webhooks/deliver.ts",
+        "changed": true
+      },
+      {
+        "id": "backoff",
+        "label": "computeBackoff",
+        "kind": "function",
+        "file": "src/webhooks/deliver.ts",
+        "changed": true
+      },
+      {
+        "id": "schedule",
+        "label": "scheduleRetry",
+        "kind": "function",
+        "file": "src/webhooks/retry-queue.ts",
+        "changed": true
+      },
+      {
+        "id": "table",
+        "label": "webhook_retries table",
+        "kind": "data",
+        "file": null,
+        "changed": true
+      },
+      {
+        "id": "worker",
+        "label": "retryWorker",
+        "kind": "module",
+        "file": "src/jobs/retry-worker.ts",
+        "changed": true
+      },
+      {
+        "id": "endpoint",
+        "label": "Customer endpoint",
+        "kind": "external",
+        "file": null,
+        "changed": false
+      }
+    ],
+    "edges": [
+      {
+        "from": "api",
+        "to": "deliver",
+        "label": "event payload"
+      },
+      {
+        "from": "deliver",
+        "to": "endpoint",
+        "label": "HTTPS POST"
+      },
+      {
+        "from": "deliver",
+        "to": "backoff",
+        "label": "attempt count"
+      },
+      {
+        "from": "deliver",
+        "to": "schedule",
+        "label": "on 5xx or timeout"
+      },
+      {
+        "from": "schedule",
+        "to": "table",
+        "label": "insert row"
+      },
+      {
+        "from": "worker",
+        "to": "table",
+        "label": "poll due rows"
+      },
+      {
+        "from": "worker",
+        "to": "deliver",
+        "label": "retry"
+      }
+    ],
+    "mermaid": "flowchart TD\n  subgraph g_1[\"src/webhooks/deliver.ts\"]\n    n_deliver(\"deliverWebhook\")\n    n_backoff(\"computeBackoff\")\n  end\n  n_api([\"POST /events\"])\n  n_schedule(\"scheduleRetry\")\n  n_table[(\"webhook_retries table\")]\n  n_worker[\"retryWorker\"]\n  n_endpoint{{\"Customer endpoint\"}}\n  n_api -->|\"event payload\"| n_deliver\n  n_deliver -->|\"HTTPS POST\"| n_endpoint\n  n_deliver -->|\"attempt count\"| n_backoff\n  n_deliver -->|\"on 5xx or timeout\"| n_schedule\n  n_schedule -->|\"insert row\"| n_table\n  n_worker -->|\"poll due rows\"| n_table\n  n_worker -->|\"retry\"| n_deliver\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_deliver,n_backoff,n_schedule,n_table,n_worker changed\n  class n_api,n_endpoint context"
+  },
+  "risks": [
+    {
+      "id": "r_3b1f0c",
+      "severity": "low",
+      "title": "Docs still describe the old 30 second timeout",
+      "file": "src/lib/http-client.ts",
+      "side": "new",
+      "lines": [12, 12],
+      "reason": "`DEFAULT_TIMEOUT_MS` is now 10000, but `docs/webhooks.md` still says requests time out after 30 seconds."
+    },
+    {
+      "id": "r_9a42d7",
+      "severity": "high",
+      "title": "Two workers can send the same retry twice",
+      "file": "src/jobs/retry-worker.ts",
+      "side": "new",
+      "lines": [18, 27],
+      "reason": "The query selects due rows without `FOR UPDATE SKIP LOCKED`. When two `retryWorker` instances poll at the same time, both read the same rows and call `deliverWebhook` for each one. Customers receive duplicate events."
+    },
+    {
+      "id": "r_51c9e8",
+      "severity": "medium",
+      "title": "Retries continue after the maximum attempt count",
+      "file": "src/webhooks/deliver.ts",
+      "side": "new",
+      "lines": [41, 44],
+      "reason": "The check `attempt > MAX_ATTEMPTS` runs after `scheduleRetry`, so attempt 6 still schedules attempt 7. Endpoints that are down permanently get one extra request per event."
+    }
+  ],
+  "tests": [
+    {
+      "id": "t_8d2e41",
+      "description": "Run two `retryWorker` processes against one database and confirm each due row is delivered once.",
+      "related_files": ["src/jobs/retry-worker.ts"]
+    },
+    {
+      "id": "t_17aa30",
+      "description": "Point a webhook at an endpoint that returns 503 and confirm retries happen at 30s, 60s, 120s, and stop after attempt 6.",
+      "related_files": ["src/webhooks/deliver.ts", "src/webhooks/retry-queue.ts"]
+    },
+    {
+      "id": "t_c40b92",
+      "description": "Confirm that a 4xx response does not schedule a retry.",
+      "related_files": ["src/webhooks/deliver.ts"]
+    },
+    {
+      "id": "t_e6f513",
+      "description": "Run the migration on a copy of production data and check that the `run_at` index exists.",
+      "related_files": ["migrations/20240611_webhook_retries.sql"]
+    },
+    {
+      "id": "t_2b9c77",
+      "description": "Search the codebase for imports of `src/lib/http` to confirm nothing still uses the old path.",
+      "related_files": ["src/lib/http-client.ts"]
+    }
+  ],
+  "skipped_files": [
+    {
+      "file": "pnpm-lock.yaml",
+      "reason": "ignored"
+    },
+    {
+      "file": "docs/retry-diagram.png",
+      "reason": "binary"
+    }
+  ],
+  "meta": {
+    "tool": {
+      "name": "lucidiff",
+      "version": "0.1.0"
+    },
+    "model": "claude-opus-5-5",
+    "provider": "anthropic",
+    "generated_at": "2026-10-02T12:00:00.000Z",
+    "pr_url": "https://github.com/acme/notifier/pull/482",
+    "source": {
+      "kind": "github",
+      "label": "acme/notifier#482",
+      "repository": "acme/notifier",
+      "base_ref": "main",
+      "head_ref": "feat/webhook-retries",
+      "author": "octocat"
+    },
+    "mode": "single",
+    "stats": {
+      "files_changed": 9,
+      "files_analyzed": 7,
+      "additions": 189,
+      "deletions": 103
+    },
+    "usage": {
+      "input_tokens": 18452,
+      "output_tokens": 2210,
+      "total_tokens": 20662,
+      "llm_calls": 1
+    },
+    "redactions": 1,
+    "dropped_risks": 1
+  }
+}
