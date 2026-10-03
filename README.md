@@ -4,6 +4,10 @@
 
 [![CI](https://github.com/Rishabjs03/pr-karpathy/actions/workflows/ci.yml/badge.svg)](https://github.com/Rishabjs03/pr-karpathy/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js 22.12+](https://img.shields.io/badge/node-%3E%3D22.12-339933.svg)](https://nodejs.org/)
+
+**[See live examples](https://rishabjs03.github.io/pr-karpathy/)** · [Quick start](#quick-start) ·
+[How it works](#how-it-works) · [Privacy and security](#privacy-and-security)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/explainer-dark.png">
@@ -27,28 +31,36 @@ citation, and renders a fixed, accessible template.
 ## Quick start
 
 You need Node.js 22.12 or later and an API key for Anthropic, OpenAI, or the Vercel AI Gateway.
+lucidiff is not on npm yet, so run it from source:
 
 ```sh
+git clone https://github.com/Rishabjs03/pr-karpathy.git lucidiff
+cd lucidiff
+corepack enable && pnpm install && pnpm build
+
 export ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY, or AI_GATEWAY_API_KEY
-npx lucidiff https://github.com/pallets/click/pull/3777 --open
+node packages/cli/dist/bin.js https://github.com/pallets/click/pull/3777 --open
 ```
 
-That's it: lucidiff fetches the PR, writes `pallets-click-3777.explainer.html`, and opens it.
-For private repositories, also set `GITHUB_TOKEN`.
+lucidiff fetches the PR, writes `pallets-click-3777.explainer.html`, and opens it. For private
+repositories, also set `GITHUB_TOKEN`. (`corepack enable` sets up pnpm. If it fails, use
+`npm install -g pnpm`.)
 
-> **Before the first npm release**, run it from source:
->
-> ```sh
-> git clone https://github.com/Rishabjs03/pr-karpathy.git && cd pr-karpathy
-> pnpm install && pnpm build
-> node packages/cli/dist/bin.js https://github.com/pallets/click/pull/3777 --open
-> ```
+To run it as `lucidiff` from any directory (for example, to explain a branch with `--git` in
+your own repository), add an alias from the clone:
+
+```sh
+alias lucidiff="node $PWD/packages/cli/dist/bin.js"
+```
+
+After the first npm release, `npx lucidiff <PR URL>` will work without a clone.
 
 ## Examples
 
 The [`examples/`](examples/) folder has explainers for three real pull requests, committed so
-you can see the output without running anything. Download an `index.html` and open it in a
-browser.
+you can see the output without running anything. Open them in your browser at
+**[rishabjs03.github.io/pr-karpathy](https://rishabjs03.github.io/pr-karpathy/)**, or download
+an `index.html`.
 
 | Example                                                        | PR                                                                 | What it shows                                                                        |
 | -------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |

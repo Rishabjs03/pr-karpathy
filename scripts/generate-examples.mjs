@@ -16,6 +16,7 @@
  *   explainer.json      The validated explainer document (generated).
  *   index.html          The rendered page (generated).
  */
+import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { explain, parseUnifiedDiff } from '@lucidiff/core';
@@ -129,8 +130,14 @@ async function liveAnswer(dir) {
   };
 }
 
+// Every folder with a source.json is an example (examples/images is not).
 const names = (await readdir(root, { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory() && (only.length === 0 || only.includes(entry.name)))
+  .filter(
+    (entry) =>
+      entry.isDirectory() &&
+      existsSync(path.join(root, entry.name, 'source.json')) &&
+      (only.length === 0 || only.includes(entry.name)),
+  )
   .map((entry) => entry.name)
   .sort();
 

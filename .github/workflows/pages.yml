@@ -1,8 +1,9 @@
 name: Examples site
 
-# Publishes examples/ to GitHub Pages, so people can open the example explainers in a browser.
-# To turn it on: Settings → Pages → Source: "GitHub Actions", then set the repository variable
-# PAGES_ENABLED to "true" (Settings → Secrets and variables → Actions → Variables).
+# Publishes examples/ to GitHub Pages: the project site and the example explainers.
+# To turn it on: Settings → Pages → Source: "GitHub Actions", then run this workflow (Actions →
+# Examples site → Run workflow) or push a change to examples/. Until Pages is on, the workflow
+# skips the deploy instead of failing.
 
 on:
   push:
@@ -20,8 +21,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    name: Check that Pages is on
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type 2>/dev/null)" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo '::notice::GitHub Pages is off. Set Settings → Pages → Source to "GitHub Actions" to publish the examples.'
+          fi
+
   deploy:
-    if: vars.PAGES_ENABLED == 'true'
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

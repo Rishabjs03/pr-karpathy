@@ -4,16 +4,51 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>lucidiff examples</title>
+    <title>lucidiff: understand a pull request before you review it</title>
+    <meta
+      name="description"
+      content="lucidiff turns a pull request into one interactive HTML page: what changed, how it flows, what can break, and what to test. Open source."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="lucidiff: understand a pull request before you review it" />
+    <meta
+      property="og:description"
+      content="One interactive HTML page per PR: what changed, how it flows, what can break (with line citations), and what to test."
+    />
+    <meta property="og:url" content="https://rishabjs03.github.io/pr-karpathy/" />
+    <meta
+      property="og:image"
+      content="https://rishabjs03.github.io/pr-karpathy/images/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%2322c55e'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='5' fill='url(%23g)'/%3E%3C/svg%3E"
+    />
     <style>
+      /* Colors are the explainer page's tokens, so the site and the explainers match. */
       :root {
         color-scheme: light;
         --bg: #fafafa;
         --surface: #ffffff;
         --border: #e4e4e7;
+        --border-strong: #d4d4d8;
         --text: #18181b;
-        --muted: #52525b;
+        --text-muted: #52525b;
+        --text-subtle: #6b6b74;
+        --code-bg: #f1f1f3;
         --accent: #4f46e5;
+        --accent-hover: #4338ca;
+        --accent-soft: #eef2ff;
+        --on-accent: #ffffff;
+        --high: #b91c1c;
+        --medium: #a14a06;
+        --low: #1d4ed8;
+        --shadow: 0 1px 2px rgb(24 24 27 / 0.04), 0 1px 3px rgb(24 24 27 / 0.06);
+        --shadow-lg: 0 24px 60px rgb(24 24 27 / 0.12);
+        --glow: rgb(79 70 229 / 0.1);
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -21,87 +56,592 @@
           --bg: #09090b;
           --surface: #111113;
           --border: #27272a;
+          --border-strong: #3f3f46;
           --text: #ececef;
-          --muted: #a8a8b0;
+          --text-muted: #a8a8b0;
+          --text-subtle: #8f8f99;
+          --code-bg: #1f1f23;
           --accent: #a5b4fc;
+          --accent-hover: #c7d2fe;
+          --accent-soft: rgb(99 102 241 / 0.16);
+          --on-accent: #111113;
+          --high: #fca5a5;
+          --medium: #fcd34d;
+          --low: #93c5fd;
+          --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+          --shadow-lg: 0 24px 60px rgb(0 0 0 / 0.5);
+          --glow: rgb(99 102 241 / 0.18);
         }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
       }
       body {
         margin: 0;
-        background: var(--bg);
+        background:
+          radial-gradient(1100px 520px at 50% -120px, var(--glow), transparent 70%), var(--bg);
         color: var(--text);
-        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      }
-      main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 56px 16px;
-      }
-      h1 {
-        font-size: 28px;
-        letter-spacing: -0.02em;
-        margin: 0 0 8px;
-      }
-      p {
-        color: var(--muted);
-        margin: 0 0 28px;
-      }
-      ul {
-        list-style: none;
-        padding: 0;
-        display: grid;
-        gap: 12px;
+        font:
+          16px/1.6 'Inter',
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
       a {
-        display: block;
-        padding: 16px 18px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: var(--surface);
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        color: var(--accent-hover);
+        text-decoration: underline;
+      }
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      code {
+        font-size: 0.88em;
+        padding: 0.1em 0.35em;
+        border-radius: 5px;
+        background: var(--code-bg);
+      }
+      pre code {
+        padding: 0;
+        background: none;
+        font-size: inherit;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-block: 18px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: -0.01em;
+        color: var(--text);
+      }
+      .brand:hover {
         color: var(--text);
         text-decoration: none;
       }
-      a:hover,
-      a:focus-visible {
+      .mark {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, var(--accent), #22c55e);
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        border-radius: 9px;
+        border: 1px solid var(--border-strong);
+        background: var(--surface);
+        color: var(--text);
+        font-weight: 600;
+        font-size: 15px;
+        box-shadow: var(--shadow);
+      }
+      .button:hover {
+        color: var(--text);
+        text-decoration: none;
         border-color: var(--accent);
       }
-      strong {
-        display: block;
+      .button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--on-accent);
       }
-      span {
-        color: var(--muted);
+      .button.primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+        color: var(--on-accent);
+      }
+      .button svg {
+        width: 18px;
+        height: 18px;
+        flex: none;
+      }
+      .hero {
+        text-align: center;
+        padding-block: 56px 40px;
+      }
+      .hero h1 {
+        font-size: clamp(34px, 6vw, 58px);
+        line-height: 1.06;
+        letter-spacing: -0.035em;
+        margin: 0 auto 20px;
+        max-width: 820px;
+      }
+      .hero p {
+        font-size: clamp(17px, 2.2vw, 20px);
+        color: var(--text-muted);
+        max-width: 680px;
+        margin: 0 auto 30px;
+      }
+      .actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .screenshot {
+        display: block;
+        margin: 8px auto 0;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+        background: var(--surface);
+      }
+      .screenshot img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      section {
+        padding-block: 56px 8px;
+      }
+      h2 {
+        font-size: 28px;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin: 0 0 8px;
+      }
+      .lead {
+        color: var(--text-muted);
+        margin: 0 0 28px;
+        max-width: 720px;
+      }
+      .examples {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 20px;
+      }
+      .example {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        color: var(--text);
+        transition:
+          border-color 0.15s,
+          transform 0.15s;
+      }
+      .example:hover {
+        color: var(--text);
+        text-decoration: none;
+        border-color: var(--accent);
+        transform: translateY(-2px);
+      }
+      .example img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-bottom: 1px solid var(--border);
+      }
+      .example .body {
+        padding: 16px 18px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+      }
+      .repo {
+        font-size: 13px;
+        color: var(--text-subtle);
+      }
+      .example strong {
+        font-size: 16px;
+        line-height: 1.35;
+      }
+      .example .finding {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        flex: 1;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        font-size: 13px;
+        color: var(--text-subtle);
+        margin-top: 4px;
+      }
+      .stats .high {
+        color: var(--high);
+      }
+      .stats .medium {
+        color: var(--medium);
+      }
+      .stats .low {
+        color: var(--low);
+      }
+      .note {
+        font-size: 14px;
+        color: var(--text-subtle);
+        margin: 18px 0 0;
+      }
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+        gap: 16px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .features li {
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      .features strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .features span {
+        color: var(--text-muted);
+        font-size: 15px;
+      }
+      .accuracy {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 14px 32px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .accuracy li {
+        padding-left: 28px;
+        position: relative;
+        color: var(--text-muted);
+      }
+      .accuracy li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.38em;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        border: 2px solid var(--accent);
+      }
+      .accuracy strong {
+        color: var(--text);
+      }
+      pre {
+        margin: 0;
+        padding: 18px 20px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--code-bg);
+        overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      pre .comment {
+        color: var(--text-subtle);
+      }
+      footer {
+        margin-top: 72px;
+        padding-block: 28px 40px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--text-subtle);
         font-size: 14px;
       }
-      code {
-        font-family: ui-monospace, Menlo, Consolas, monospace;
-        font-size: 0.9em;
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      @media (max-width: 640px) {
+        .wrap {
+          padding: 0 16px;
+        }
+        .hero {
+          padding-block: 32px 28px;
+        }
+        section {
+          padding-block: 44px 4px;
+        }
+        h2 {
+          font-size: 24px;
+        }
+        pre {
+          font-size: 13px;
+          padding: 14px 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        .example {
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>lucidiff examples</h1>
-      <p>Explainers for three real pull requests, generated by lucidiff.</p>
-      <ul>
-        <li>
-          <a href="ky-880-signal-replace/"
-            ><strong>sindresorhus/ky#880: Fix <code>signal</code> replacement when extending instances</strong
-            ><span>A small fix, 4 files, a regression for <code>signal: undefined</code></span></a
-          >
-        </li>
-        <li>
-          <a href="click-3777-pager-params/"
-            ><strong>pallets/click#3777: Forward <code>PAGER</code> parameters and improve flag detection</strong
-            ><span>Python, 3 files, a color regression for <code>LESS=FRX</code></span></a
-          >
-        </li>
-        <li>
-          <a href="ky-842-network-error/"
-            ><strong>sindresorhus/ky#842: Add <code>NetworkError</code> and tighten retry logic</strong
-            ><span>15 files, a breaking change, flow diagram, seven checks</span></a
-          >
-        </li>
-      </ul>
-    </main>
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="./"><span class="mark" aria-hidden="true"></span>lucidiff</a>
+        <a class="button" href="https://github.com/Rishabjs03/pr-karpathy">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+            />
+          </svg>
+          GitHub
+        </a>
+      </header>
+
+      <main>
+        <div class="hero">
+          <h1>Understand a pull request before you review it.</h1>
+          <p>
+            lucidiff reads a PR and writes one self-contained HTML page: what changed and why, how
+            the parts connect, what can break, and what to test. Every risk cites the exact lines,
+            and the citations are checked against the diff.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="#examples">See real examples</a>
+            <a class="button" href="https://github.com/Rishabjs03/pr-karpathy#quick-start"
+              >Quick start</a
+            >
+          </div>
+        </div>
+
+        <a
+          class="screenshot"
+          href="click-3777-pager-params/"
+          aria-label="Open the explainer for pallets/click#3777"
+        >
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="images/explainer-dark.png" />
+            <img
+              src="images/explainer-light.png"
+              width="1800"
+              height="1290"
+              alt="The explainer for pallets/click#3777: title, summary, and cards for 3 files, 3 risks, and 6 checks"
+            />
+          </picture>
+        </a>
+
+        <section id="examples">
+          <h2>Real pull requests, live model output</h2>
+          <p class="lead">
+            Each page below explains a merged PR from a popular open-source project, written by
+            <code>claude-opus-5-5</code> in one model call. Open one and try the flow diagram, the
+            risk links, and the checklist.
+          </p>
+          <div class="examples">
+            <a class="example" href="ky-880-signal-replace/">
+              <picture>
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcset="images/ky-880-signal-replace-dark.jpg"
+                />
+                <img
+                  src="images/ky-880-signal-replace-light.jpg"
+                  width="1100"
+                  height="690"
+                  loading="lazy"
+                  alt=""
+                />
+              </picture>
+              <div class="body">
+                <span class="repo">sindresorhus/ky#880 · TypeScript</span>
+                <strong>Fix <code>signal</code> replacement when extending instances</strong>
+                <span class="finding"
+                  >Found a regression: a per-request <code>signal: undefined</code> now drops the
+                  instance's abort signal.</span
+                >
+                <span class="stats"
+                  ><span>4 files</span><span class="medium">1 medium risk</span
+                  ><span>5 checks</span></span
+                >
+              </div>
+            </a>
+            <a class="example" href="click-3777-pager-params/">
+              <picture>
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcset="images/click-3777-pager-params-dark.jpg"
+                />
+                <img
+                  src="images/click-3777-pager-params-light.jpg"
+                  width="1100"
+                  height="690"
+                  loading="lazy"
+                  alt=""
+                />
+              </picture>
+              <div class="body">
+                <span class="repo">pallets/click#3777 · Python</span>
+                <strong>Forward <code>PAGER</code> parameters and improve flag detection</strong>
+                <span class="finding"
+                  >Found that <code>LESS=FRX</code>, Git's default, no longer keeps colors, and that
+                  <code>less --raw</code> is not detected.</span
+                >
+                <span class="stats"
+                  ><span>3 files</span><span class="medium">1 medium</span
+                  ><span class="low">2 low</span><span>6 checks</span></span
+                >
+              </div>
+            </a>
+            <a class="example" href="ky-842-network-error/">
+              <picture>
+                <source
+                  media="(prefers-color-scheme: dark)"
+                  srcset="images/ky-842-network-error-dark.jpg"
+                />
+                <img
+                  src="images/ky-842-network-error-light.jpg"
+                  width="1100"
+                  height="690"
+                  loading="lazy"
+                  alt=""
+                />
+              </picture>
+              <div class="body">
+                <span class="repo">sindresorhus/ky#842 · TypeScript</span>
+                <strong>Add <code>NetworkError</code> and tighten retry logic</strong>
+                <span class="finding"
+                  >Flagged a breaking change: network failures no longer reach callers as a
+                  <code>TypeError</code>.</span
+                >
+                <span class="stats"
+                  ><span>15 files</span><span class="high">1 high</span
+                  ><span class="medium">1 medium</span><span class="low">1 low</span
+                  ><span>7 checks</span></span
+                >
+              </div>
+            </a>
+          </div>
+          <p class="note">
+            Every risk on these pages was confirmed by running the PR's own code.
+            <a
+              href="https://github.com/Rishabjs03/pr-karpathy/tree/main/examples#how-these-were-made"
+              >How they were made</a
+            >
+          </p>
+        </section>
+
+        <section>
+          <h2>One page per PR</h2>
+          <p class="lead">
+            A single HTML file that follows your light or dark setting and is easy to share.
+          </p>
+          <ul class="features">
+            <li>
+              <strong>Summary</strong
+              ><span>What the PR does and why, in plain technical English.</span>
+            </li>
+            <li>
+              <strong>Changes</strong><span>One card per file: what changed and why it matters.</span>
+            </li>
+            <li><strong>Flow</strong><span>A diagram of how the changed parts connect.</span></li>
+            <li>
+              <strong>Risks</strong
+              ><span>Severity, the failure mechanism, and a link to the exact lines.</span>
+            </li>
+            <li>
+              <strong>Test checklist</strong
+              ><span>Specific checks to run, with checkboxes that remember their state.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Built to be accurate</h2>
+          <p class="lead">An explainer is only useful if you can trust it.</p>
+          <ul class="accuracy">
+            <li>
+              <strong>The model never writes HTML.</strong> It fills a JSON schema, and lucidiff
+              renders a fixed, accessible template.
+            </li>
+            <li>
+              <strong>Citations are checked.</strong> A risk whose lines are not in the diff is
+              dropped, and the page says how many were.
+            </li>
+            <li>
+              <strong>No invented concerns.</strong> Zero risks is a valid answer. Style nits are
+              not risks.
+            </li>
+            <li>
+              <strong>Full context.</strong> For GitHub PRs and git ranges, the model sees the
+              whole changed files, not only the diff.
+            </li>
+            <li>
+              <strong>Diagrams that render.</strong> The flow is a validated graph compiled to
+              Mermaid, with one repair attempt and a text fallback.
+            </li>
+            <li>
+              <strong>Secrets stay local.</strong> Likely secrets are redacted before anything is
+              sent to the model.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Try it</h2>
+          <p class="lead">
+            You need Node.js 22.12 or later and an API key for Anthropic, OpenAI, or the Vercel AI
+            Gateway. The npm package is coming soon. For now, run it from source:
+          </p>
+          <pre><code><span class="comment"># Install and build</span>
+git clone https://github.com/Rishabjs03/pr-karpathy.git lucidiff
+cd lucidiff
+corepack enable &amp;&amp; pnpm install &amp;&amp; pnpm build
+
+<span class="comment"># Explain any public PR</span>
+export ANTHROPIC_API_KEY=...
+node packages/cli/dist/bin.js https://github.com/pallets/click/pull/3777 --open</code></pre>
+        </section>
+      </main>
+
+      <footer>
+        <span>lucidiff · MIT License</span>
+        <nav aria-label="Project links">
+          <a href="https://github.com/Rishabjs03/pr-karpathy">GitHub</a>
+          <a href="https://github.com/Rishabjs03/pr-karpathy#readme">Documentation</a>
+          <a href="https://github.com/Rishabjs03/pr-karpathy/issues">Issues</a>
+        </nav>
+      </footer>
+    </div>
   </body>
 </html>

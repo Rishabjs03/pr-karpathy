@@ -61,7 +61,7 @@ on its side of that line.
 | Recompile the sample flow after compiler edits | `node scripts/update-sample-flow.mjs`                                 |
 | Regenerate the examples (replay, no API key)   | `pnpm examples`                                                       |
 | Regenerate the examples with a live model      | `pnpm build && node scripts/generate-examples.mjs --live`             |
-| Regenerate the README screenshots              | `node scripts/readme-images.mjs`                                      |
+| Regenerate the screenshots and site images     | `node scripts/readme-images.mjs`                                      |
 | Add a changeset                                | `pnpm changeset`                                                      |
 
 ### Working on the page design
@@ -76,9 +76,10 @@ diff.
 
 `examples/` holds three real PRs with their generated explainers. After a renderer or pipeline
 change, run `pnpm examples` to re-render them from the stored model answers, and
-`node scripts/readme-images.mjs` if the README screenshots should change. The examples site
-workflow (`.github/workflows/pages.yml`) publishes the folder to GitHub Pages once Pages is
-enabled and the `PAGES_ENABLED` repository variable is `true`.
+`node scripts/readme-images.mjs` if the screenshots should change (it also refreshes the images
+in `examples/images/`). `examples/index.html` is the project site. The examples site workflow
+(`.github/workflows/pages.yml`) publishes the folder to GitHub Pages once Pages is set to
+deploy from GitHub Actions.
 
 ### Working on the prompts
 
