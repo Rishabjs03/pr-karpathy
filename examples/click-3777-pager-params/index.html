@@ -6,9 +6,9 @@
     <meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;sha256-G3Y8W3yR7qO0Df2oHUgzTju4T2B7S47RLHZ7OHNzpRo=&#39; &#39;sha256-6hPih1DKiVf1uoatEi1z78uH0BaSRHPhWI7gmH3eAzc=&#39; https://cdn.jsdelivr.net; style-src &#39;unsafe-inline&#39;; img-src data:; font-src data:; base-uri &#39;none&#39;; form-action &#39;none&#39;" />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="_tempfilepager now passes the parameters from PAGER to the pager, before the temporary file name. On Windows, PAGER=&quot;less -R&quot; now runs less -R instead of bare less." />
+    <meta name="description" content="_tempfilepager now receives cmd_params and runs the pager as [cmd_path, *cmd_params, tempfile]. Before, it ran [cmd_path, tempfile] and dropped flags from PAGER. On Windows, PAGER=&quot;less -R&quot; now runs l" />
     <meta name="generator" content="lucidiff" />
-    <title>Forward PAGER parameters to the temp-file pager and parse less flags · lucidiff</title>
+    <title>Forward PAGER parameters to the temp file pager and tokenize less raw-mode detection · lucidiff</title>
     <script>// Runs in <head> before first paint, so a saved theme choice never flashes the other theme.
 (function () {
   try {
@@ -1443,7 +1443,7 @@ a.location {
                 >
               </li><li>
                 <a href="#tests" data-nav="tests"
-                  >Tests<span class="nav-count">4</span></a
+                  >Tests<span class="nav-count">6</span></a
                 >
               </li>
         </ul>
@@ -1458,7 +1458,7 @@ a.location {
     <p class="eyebrow"><a href="https://github.com/pallets/click/pull/3777" rel="noopener noreferrer" target="_blank"
         >pallets/click#3777 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       ></p>
-    <h1>Forward <code class="nowrap">PAGER</code> parameters to the temp-file pager and parse <code class="nowrap">less</code> flags</h1>
+    <h1>Forward PAGER parameters to the temp file pager and tokenize less raw-mode detection</h1>
     <div class="hero-meta">
       
       <span>3 files changed</span>
@@ -1470,7 +1470,7 @@ a.location {
     </div>
   </header> <section class="section" id="summary" aria-labelledby="summary-title">
     <h2 id="summary-title">Summary</h2>
-    <div class="prose summary"><p><code class="nowrap">_tempfilepager</code> now passes the parameters from <code class="nowrap">PAGER</code> to the pager, before the temporary file name. On Windows, <code class="nowrap">PAGER=&quot;less -R&quot;</code> now runs <code class="nowrap">less -R</code> instead of bare <code class="nowrap">less</code>.</p><p>The PR also replaces the substring check for raw mode in <code class="nowrap">_pipepager</code>. The new <code class="nowrap">_less_uses_raw_mode</code> splits <code class="nowrap">LESS</code> and the pager arguments into tokens. Only short-option clusters with an <code class="nowrap">r</code>, and <code class="nowrap">--raw-control-chars</code>, count as a raw-mode request. This removes false positives from filenames such as <code class="nowrap">requirements.txt</code>. It also changes the result for a <code class="nowrap">LESS</code> value without a dash, such as <code class="nowrap">FRX</code>.</p></div>
+    <div class="prose summary"><p><code class="nowrap">_tempfilepager</code> now receives <code class="nowrap">cmd_params</code> and runs the pager as <code>[cmd_path, *cmd_params, tempfile]</code>. Before, it ran <code class="nowrap">[cmd_path, tempfile]</code> and dropped flags from <code class="nowrap">PAGER</code>. On Windows, <code class="nowrap">PAGER=&quot;less -R&quot;</code> now runs <code class="nowrap">less -R</code> on the temporary file.</p><p><code class="nowrap">_pipepager</code> now decides whether <code class="nowrap">less</code> already shows raw color through a new helper, <code class="nowrap">_less_uses_raw_mode</code>. The helper shlex-splits <code class="nowrap">LESS</code>, appends <code class="nowrap">cmd_params</code>, and accepts only dash-prefixed short-option clusters containing <code class="nowrap">r</code>/<code class="nowrap">R</code> or the exact <code class="nowrap">--raw-control-chars</code> token. The old check matched any <code class="nowrap">r</code> or <code class="nowrap">R</code> anywhere in the joined string. The less match now compares <code class="nowrap">cmd_path.stem</code>, so <code class="nowrap">less.exe</code> counts, and it casefolds on Windows. <code class="nowrap">LESS=-R</code> is still injected only when both <code class="nowrap">LESS</code> and <code class="nowrap">cmd_params</code> are empty.</p></div>
     <ul class="glance" aria-label="At a glance">
       <li>
         <a href="#changes"
@@ -1486,7 +1486,7 @@ a.location {
       </li>
       <li>
         <a href="#tests"
-          ><span class="glance-value">4 checks</span
+          ><span class="glance-value">6 checks</span
           ><span class="glance-label">to verify</span></a
         >
       </li>
@@ -1512,18 +1512,18 @@ a.location {
           ><span class="add">+50</span>
           <span class="del">−11</span></span
         >
-        <span class="change-preview">Adds <code class="nowrap">_less_uses_raw_mode</code>, which splits <code class="nowrap">LESS</code> with <code class="nowrap">shlex.split</code> and checks each option token. <code class="nowrap">_pipepager</code> calls it and matches the pager by <code class="nowrap">cmd_path.stem</code>. <code class="nowrap">_tempfilepager</code> takes a new <code class="nowrap">cmd_params</code> argument and passes it to <code class="nowrap">subprocess.call</code>.</span>
+        <span class="change-preview"><code class="nowrap">_pager_contextmanager</code> passes <code class="nowrap">cmd_params</code> to <code class="nowrap">_tempfilepager</code>. <code class="nowrap">_tempfilepager</code> gains a <code class="nowrap">cmd_params</code> argument and adds it to the <code class="nowrap">subprocess.call</code> argv before the file name. Adds <code>_less_uses_raw_mode(less_env, cmd_params)</code>. <code class="nowrap">_pipepager</code> matches less on <code class="nowrap">cmd_path.stem</code>, casefolded under <code class="nowrap">WIN</code>, and calls the new helper instead of a substring check.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code class="nowrap">_less_uses_raw_mode</code>, which splits <code class="nowrap">LESS</code> with <code class="nowrap">shlex.split</code> and checks each option token. <code class="nowrap">_pipepager</code> calls it and matches the pager by <code class="nowrap">cmd_path.stem</code>. <code class="nowrap">_tempfilepager</code> takes a new <code class="nowrap">cmd_params</code> argument and passes it to <code class="nowrap">subprocess.call</code>.</dd>
+                  <dd><code class="nowrap">_pager_contextmanager</code> passes <code class="nowrap">cmd_params</code> to <code class="nowrap">_tempfilepager</code>. <code class="nowrap">_tempfilepager</code> gains a <code class="nowrap">cmd_params</code> argument and adds it to the <code class="nowrap">subprocess.call</code> argv before the file name. Adds <code>_less_uses_raw_mode(less_env, cmd_params)</code>. <code class="nowrap">_pipepager</code> matches less on <code class="nowrap">cmd_path.stem</code>, casefolded under <code class="nowrap">WIN</code>, and calls the new helper instead of a substring check.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Color detection for <code class="nowrap">less</code> no longer reacts to an <code class="nowrap">r</code> in filenames or long-option values. Windows users keep the options they set in <code class="nowrap">PAGER</code>. The detection now also ignores <code class="nowrap">LESS</code> values without a leading dash, which <code class="nowrap">less</code> accepts.</dd>
+                        <dd>Users get their <code class="nowrap">PAGER</code> flags on the temp file backend. Fewer filenames and option values falsely enable color. Inputs that do not fit the token rules no longer enable color, including dash-less <code class="nowrap">LESS</code> values and abbreviated long options.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eab" rel="noopener noreferrer" target="_blank"
@@ -1543,18 +1543,18 @@ a.location {
           ><span class="add">+171</span>
           <span class="del">−1</span></span
         >
-        <span class="change-preview">Adds parametrized tests for <code class="nowrap">less</code> detection by file stem, case-insensitive matching on Windows, raw-mode token parsing, and parameter forwarding in the temp-file pager.</span>
+        <span class="change-preview">Adds <code>test_pipepager_less_detection_matches_stem</code>, <code>test_pipepager_less_detection_case_insensitive_on_windows</code>, a parametrized <code>test_pipepager_less_raw_mode_detection</code> with a <code class="nowrap">_FakePagerProcess</code> Popen stub, and <code>test_tempfile_pager_passes_pager_params</code> using <code class="nowrap">head -n 1</code>. <code class="nowrap">_force_tempfile_pager</code> now runs <code class="nowrap">shutil.which</code> on only the first shlex token of <code class="nowrap">pager_cmd</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds parametrized tests for <code class="nowrap">less</code> detection by file stem, case-insensitive matching on Windows, raw-mode token parsing, and parameter forwarding in the temp-file pager.</dd>
+                  <dd>Adds <code>test_pipepager_less_detection_matches_stem</code>, <code>test_pipepager_less_detection_case_insensitive_on_windows</code>, a parametrized <code>test_pipepager_less_raw_mode_detection</code> with a <code class="nowrap">_FakePagerProcess</code> Popen stub, and <code>test_tempfile_pager_passes_pager_params</code> using <code class="nowrap">head -n 1</code>. <code class="nowrap">_force_tempfile_pager</code> now runs <code class="nowrap">shutil.which</code> on only the first shlex token of <code class="nowrap">pager_cmd</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The cases cover filenames with <code class="nowrap">r</code>, long options with values, <code class="nowrap">--</code>, and an unparsable <code class="nowrap">LESS</code>. They do not cover a dashless <code class="nowrap">LESS</code> such as <code class="nowrap">FRX</code>, or short options with attached values such as <code class="nowrap">-orecord.log</code>.</dd>
+                        <dd>Covers stem matching, token-based detection, and forwarding of parameters. The helper change lets <code class="nowrap">pager_cmd</code> carry arguments.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/pallets/click/pull/3777/files#diff-e9b43a3662176468b449eee04c777e29d67212bfc0dc0ca42a03b32d970b0dea" rel="noopener noreferrer" target="_blank"
@@ -1574,18 +1574,18 @@ a.location {
           ><span class="add">+6</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds two entries to the unreleased section: parameter forwarding in the temp-file pager, and token-based raw-mode detection.</span>
+        <span class="change-preview">Adds two Unreleased entries: temp file pager forwards <code class="nowrap">PAGER</code> parameters, and raw mode detection parses option tokens.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds two entries to the unreleased section: parameter forwarding in the temp-file pager, and token-based raw-mode detection.</dd>
+                  <dd>Adds two Unreleased entries: temp file pager forwards <code class="nowrap">PAGER</code> parameters, and raw mode detection parses option tokens.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Documents the user-visible pager behavior change.</dd>
+                        <dd>Changelog only.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/pallets/click/pull/3777/files#diff-d975bf659606195d2165918f93e1cf680ef68ea3c9cab994f033705fea8238b2" rel="noopener noreferrer" target="_blank"
@@ -1603,7 +1603,7 @@ a.location {
                       data-flow-diagram
                       data-state="loading"
                       role="img"
-                      aria-label="`echo_via_pager` opens a pager through `_pager_contextmanager`, which picks `_tempfilepager` on Windows and `_pipepager` elsewhere. Both now receive the `PAGER` parameters. `_pipepager` asks `_less_uses_raw_mode` whether to keep colors."
+                      aria-label="`get_pager_file` resolves `PAGER` into a command path and params. `_pager_contextmanager` routes them to either the pipe backend or the temp file backend. The pipe backend asks `_less_uses_raw_mode` whether to enable color."
                     >
                       <p class="flow-status muted" data-flow-status>Rendering diagram…</p>
                     </div>
@@ -1615,7 +1615,7 @@ a.location {
                         ><span class="swatch swatch-context"></span>Unchanged context</span
                       >
                     </div>
-            <figcaption><code class="nowrap">echo_via_pager</code> opens a pager through <code class="nowrap">_pager_contextmanager</code>, which picks <code class="nowrap">_tempfilepager</code> on Windows and <code class="nowrap">_pipepager</code> elsewhere. Both now receive the <code class="nowrap">PAGER</code> parameters. <code class="nowrap">_pipepager</code> asks <code class="nowrap">_less_uses_raw_mode</code> whether to keep colors.</figcaption>
+            <figcaption><code class="nowrap">get_pager_file</code> resolves <code class="nowrap">PAGER</code> into a command path and params. <code class="nowrap">_pager_contextmanager</code> routes them to either the pipe backend or the temp file backend. The pipe backend asks <code class="nowrap">_less_uses_raw_mode</code> whether to enable color.</figcaption>
             <details class="flow-text" data-flow-text >
     <summary>Components and connections</summary>
     <div class="flow-text-body">
@@ -1624,18 +1624,10 @@ a.location {
         <ul>
           <li>
                 <span class="flow-node-name "
-                  >echo_via_pager</span
+                  >get_pager_file</span
                 >
                 <span class="muted"
                   >entry point</span
-                >
-                
-              </li><li>
-                <span class="flow-node-name "
-                  >PAGER and LESS variables</span
-                >
-                <span class="muted"
-                  >data</span
                 >
                 
               </li><li>
@@ -1656,14 +1648,6 @@ a.location {
                 <code>src/click/_termui_impl.py</code>
               </li><li>
                 <span class="flow-node-name is-changed"
-                  >_tempfilepager</span
-                >
-                <span class="muted"
-                  >function, changed</span
-                >
-                <code>src/click/_termui_impl.py</code>
-              </li><li>
-                <span class="flow-node-name is-changed"
                   >_less_uses_raw_mode</span
                 >
                 <span class="muted"
@@ -1671,8 +1655,16 @@ a.location {
                 >
                 <code>src/click/_termui_impl.py</code>
               </li><li>
+                <span class="flow-node-name is-changed"
+                  >_tempfilepager</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>src/click/_termui_impl.py</code>
+              </li><li>
                 <span class="flow-node-name "
-                  >less or more process</span
+                  >pager subprocess</span
                 >
                 <span class="muted"
                   >external service</span
@@ -1685,29 +1677,23 @@ a.location {
         <h3>Connections</h3>
         <ul>
                 <li>
-                      echo_via_pager → _pager_contextmanager
-                      <span class="muted">(color setting)</span>
-                    </li><li>
-                      PAGER and LESS variables → _pager_contextmanager
-                      <span class="muted">(PAGER command)</span>
+                      get_pager_file → _pager_contextmanager
+                      <span class="muted">(color)</span>
                     </li><li>
                       _pager_contextmanager → _pipepager
                       <span class="muted">(cmd_path, cmd_params)</span>
                     </li><li>
                       _pager_contextmanager → _tempfilepager
-                      <span class="muted">(cmd_path, cmd_params on Windows)</span>
-                    </li><li>
-                      PAGER and LESS variables → _less_uses_raw_mode
-                      <span class="muted">(LESS value)</span>
+                      <span class="muted">(cmd_path, cmd_params)</span>
                     </li><li>
                       _pipepager → _less_uses_raw_mode
-                      <span class="muted">(cmd_params)</span>
+                      <span class="muted">(LESS, cmd_params)</span>
                     </li><li>
-                      _pipepager → less or more process
-                      <span class="muted">(text on stdin)</span>
+                      _pipepager → pager subprocess
+                      <span class="muted">(Popen with env LESS)</span>
                     </li><li>
-                      _tempfilepager → less or more process
-                      <span class="muted">(params and temp file)</span>
+                      _tempfilepager → pager subprocess
+                      <span class="muted">(argv params + file)</span>
                     </li>
               </ul>
       </div>
@@ -1721,33 +1707,33 @@ a.location {
       <p class="section-note">0 high · 1 medium · 2 low</p>
     </div>
     <ol class="risk-list">
-            <li class="risk severity-medium" id="risk-r_38c943ac2a">
+            <li class="risk severity-medium" id="risk-r_afd42bd451">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
-      <h3 class="risk-title">A dashless <code class="nowrap">LESS</code> value such as <code class="nowrap">FRX</code> no longer keeps colors</h3>
+      <h3 class="risk-title">Dash-less LESS values like <code class="nowrap">FRX</code> no longer enable color</h3>
     </div>
-    <a class="location mono" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eabR537-R545" rel="noopener noreferrer" target="_blank"
-        >src/click/_termui_impl.py:537–545 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+    <a class="location mono" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eabR537-R543" rel="noopener noreferrer" target="_blank"
+        >src/click/_termui_impl.py:537–543 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason"><code class="nowrap">_less_uses_raw_mode</code> reads only tokens that start with <code class="nowrap">-</code>, so <code class="nowrap">LESS=FRX</code> returns <code class="nowrap">False</code> at line 545. <code class="nowrap">less</code> accepts dashless option strings, and <code class="nowrap">FRX</code> is a common value (it is Git&#39;s default). Line 582 then skips the <code class="nowrap">LESS=-R</code> injection because <code class="nowrap">LESS</code> is set, and <code class="nowrap">get_pager_file</code> strips all ANSI styling. The old substring check found the <code class="nowrap">R</code> and kept colors.</p>
-  </li><li class="risk severity-low" id="risk-r_6bd2084bf3">
+    <p class="risk-reason"><code class="nowrap">less</code> accepts option letters in <code class="nowrap">LESS</code> without a leading dash; git, for example, sets <code class="nowrap">LESS=FRX</code>. The old check found <code class="nowrap">R</code> in that string and set <code class="nowrap">color = True</code>. The new loop skips tokens that do not start with <code class="nowrap">-</code>, so <code class="nowrap">FRX</code> returns False. <code class="nowrap">LESS</code> is non-empty, so <code class="nowrap">-R</code> is not injected either. ANSI codes are then stripped where they used to be shown.</p>
+  </li><li class="risk severity-low" id="risk-r_d278d568f1">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
-      <h3 class="risk-title">An <code class="nowrap">r</code> in an attached option value turns on colors</h3>
+      <h3 class="risk-title">Abbreviated <code class="nowrap">--raw</code> long option not detected</h3>
+    </div>
+    <a class="location mono" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eabR538-R540" rel="noopener noreferrer" target="_blank"
+        >src/click/_termui_impl.py:538–540 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+      >
+    <p class="risk-reason"><code class="nowrap">less</code> accepts unambiguous long-option prefixes such as <code class="nowrap">--raw</code>. The new code requires the exact <code class="nowrap">--raw-control-chars</code> token, so <code class="nowrap">PAGER=&quot;less --raw&quot;</code> leaves color off. The old substring check enabled it.</p>
+  </li><li class="risk severity-low" id="risk-r_c63209ee84">
+    <div class="risk-head">
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
+      <h3 class="risk-title">Option arguments in short clusters cause false positives</h3>
     </div>
     <a class="location mono" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eabR541-R543" rel="noopener noreferrer" target="_blank"
         >src/click/_termui_impl.py:541–543 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">Line 542 treats any <code class="nowrap">r</code> after the first dash as a raw-mode flag. <code class="nowrap">less</code> options such as <code class="nowrap">-o</code>, <code class="nowrap">-k</code>, and <code class="nowrap">-P</code> take an attached value, so <code class="nowrap">LESS=-orecord.log</code> returns <code class="nowrap">True</code>. Click then keeps the ANSI codes, but <code class="nowrap">less</code> is not in raw mode and shows them as <code class="nowrap">ESC[</code> text.</p>
-  </li><li class="risk severity-low" id="risk-r_d1b588bbea">
-    <div class="risk-head">
-      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
-      <h3 class="risk-title">The Windows temp-file pager still drops colors</h3>
-    </div>
-    <a class="location mono" href="https://github.com/pallets/click/pull/3777/files#diff-f25fea0c0c214556563712a06f29270750a9b484a56d6a4df07ad5ae181b3eabR657-R660" rel="noopener noreferrer" target="_blank"
-        >src/click/_termui_impl.py:657–660 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
-      >
-    <p class="risk-reason"><code class="nowrap">_tempfilepager</code> yields <code class="nowrap">color</code> unchanged at line 657, so automatic detection stays <code class="nowrap">None</code>. <code class="nowrap">get_pager_file</code> treats <code class="nowrap">None</code> as no color and strips ANSI codes before they reach the file. <code class="nowrap">PAGER=&quot;less -R&quot;</code> now reaches <code class="nowrap">less</code> at line 660, but styled output still shows plain unless the caller passes <code class="nowrap">color=True</code>.</p>
+    <p class="risk-reason">Any dash token containing <code class="nowrap">r</code> counts, including values attached to options such as <code class="nowrap">-pError</code> (search pattern) or <code class="nowrap">-+R</code> (reset R to default). These report raw mode as on when less does not use it, so ANSI output passes through unfiltered.</p>
   </li>
           </ol>
   </section> <section class="section" id="tests" aria-labelledby="tests-title">
@@ -1755,7 +1741,7 @@ a.location {
       <h2 id="tests-title">Test checklist</h2>
       <div class="section-tools">
               <span class="section-note" data-check-progress aria-live="polite"
-                >0 of 4 done</span
+                >0 of 6 done</span
               >
               <button type="button" class="text-button" data-check-reset>Reset</button>
             </div>
@@ -1766,36 +1752,54 @@ a.location {
             <ul class="checklist">
               <li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_ae8a58375f" />
+                      <input type="checkbox" data-check-id="t_6d6694269f" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Run a Click command that calls <code class="nowrap">echo_via_pager</code> with styled text and <code class="nowrap">LESS=FRX</code>. Check whether colors still show; before this PR they did.</span>
+                      <span class="check-text">Set <code class="nowrap">LESS=FRX</code> and <code class="nowrap">PAGER=less</code>, call <code class="nowrap">click.echo_via_pager</code> with styled text. Confirm whether color is kept, and compare against the pre-PR behavior.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_b843889f2e" />
+                      <input type="checkbox" data-check-id="t_87edbdf3d5" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Set <code class="nowrap">LESS=-orecord.log</code>, page styled text, and confirm that <code class="nowrap">less</code> does not show raw <code class="nowrap">ESC[</code> sequences.</span>
+                      <span class="check-text">Run <code>_pipepager(Path(&quot;/x/less&quot;), [&quot;--raw&quot;])</code> with <code class="nowrap">LESS</code> unset. Confirm the returned color matches the intended behavior for abbreviated long options.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_01b3b34729" />
+                      <input type="checkbox" data-check-id="t_8429ec845b" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">On Windows, set <code class="nowrap">PAGER=&quot;less -R&quot;</code>, page styled text, and confirm that <code class="nowrap">less</code> receives <code class="nowrap">-R</code>. Then check whether the colors appear.</span>
+                      <span class="check-text">On Windows, set <code class="nowrap">PAGER=&quot;less -R&quot;</code> and run <code class="nowrap">echo_via_pager</code> with ANSI text. Confirm <code class="nowrap">less</code> receives <code class="nowrap">-R</code> before the temp file path and renders color.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
-                            <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li><li><code title="tests/test_termui.py">test_termui.py</code></li>
+                            <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_f6fb5d3383" />
+                      <input type="checkbox" data-check-id="t_2384201608" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">On Linux, set <code class="nowrap">PAGER=&quot;less -X&quot;</code> with <code class="nowrap">LESS</code> unset. Confirm the pager starts with <code class="nowrap">-X</code> and that no <code class="nowrap">LESS=-R</code> is injected.</span>
+                      <span class="check-text">On Windows with <code class="nowrap">PAGER=more</code>, confirm <code class="nowrap">echo_via_pager</code> still opens the temp file with an empty <code class="nowrap">cmd_params</code> list.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_6b480dc6ed" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Run the new tests in <code class="nowrap">tests/test_termui.py</code> on Linux and Windows CI. Confirm the <code class="nowrap">head -n 1</code> test runs where <code class="nowrap">head</code> exists and prints only <code class="nowrap">line one</code>.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="tests/test_termui.py">test_termui.py</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_0cec4e4bb6" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Set <code class="nowrap">PAGER=less</code> with <code class="nowrap">LESS</code> unset. Confirm the spawned process env has <code class="nowrap">LESS=-R</code> and that color is True.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="src/click/_termui_impl.py">_termui_impl.py</code></li>
@@ -1813,16 +1817,16 @@ a.location {
             <dd><code>claude-opus-5-5</code></dd>
           </div><div>
             <dt>Provider</dt>
-            <dd>replay</dd>
+            <dd>anthropic</dd>
           </div><div>
             <dt>Generated</dt>
-            <dd><time datetime="2026-10-02T20:00:00.000Z">2026-10-02 20:00 UTC</time></dd>
+            <dd><time datetime="2026-10-02T21:08:15.065Z">2026-10-02 21:08 UTC</time></dd>
           </div><div>
             <dt>Analysis</dt>
             <dd>1 model call</dd>
           </div><div>
             <dt>Tokens</dt>
-            <dd>Not reported</dd>
+            <dd>11,119 in · 3,521 out</dd>
           </div><div>
             <dt>Files analyzed</dt>
             <dd>3 of 3</dd>
@@ -1840,7 +1844,7 @@ a.location {
     </p>
   </footer>
     </main>
-    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/pallets/click/pull/3777","mermaid":"flowchart TD\n  n_echo_via_pager([\"echo_via_pager\"])\n  n_env[(\"PAGER and LESS variables\")]\n  n_pager_cm(\"_pager_contextmanager\")\n  n_pipepager(\"_pipepager\")\n  n_tempfilepager(\"_tempfilepager\")\n  n_raw_mode(\"_less_uses_raw_mode\")\n  n_pager_process{{\"less or more process\"}}\n  n_echo_via_pager -->|\"color setting\"| n_pager_cm\n  n_env -->|\"PAGER command\"| n_pager_cm\n  n_pager_cm -->|\"cmd_path, cmd_params\"| n_pipepager\n  n_pager_cm -->|\"cmd_path, cmd_params on Windows\"| n_tempfilepager\n  n_env -->|\"LESS value\"| n_raw_mode\n  n_pipepager -->|\"cmd_params\"| n_raw_mode\n  n_pipepager -->|\"text on stdin\"| n_pager_process\n  n_tempfilepager -->|\"params and temp file\"| n_pager_process\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_pager_cm,n_pipepager,n_tempfilepager,n_raw_mode changed\n  class n_echo_via_pager,n_env,n_pager_process context"}</script>
+    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/pallets/click/pull/3777","mermaid":"flowchart TD\n  n_get_pager_file([\"get_pager_file\"])\n  n_pager_cm(\"_pager_contextmanager\")\n  n_pipepager(\"_pipepager\")\n  n_raw_mode(\"_less_uses_raw_mode\")\n  n_tempfilepager(\"_tempfilepager\")\n  n_pager_proc{{\"pager subprocess\"}}\n  n_get_pager_file -->|\"color\"| n_pager_cm\n  n_pager_cm -->|\"cmd_path, cmd_params\"| n_pipepager\n  n_pager_cm -->|\"cmd_path, cmd_params\"| n_tempfilepager\n  n_pipepager -->|\"LESS, cmd_params\"| n_raw_mode\n  n_pipepager -->|\"Popen with env LESS\"| n_pager_proc\n  n_tempfilepager -->|\"argv params + file\"| n_pager_proc\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_pager_cm,n_pipepager,n_raw_mode,n_tempfilepager changed\n  class n_get_pager_file,n_pager_proc context"}</script>
     <script>// Page behavior for the generated explainer. Plain browser JavaScript, no dependencies.
 //
 // 1. Theme toggle (light/dark), saved in localStorage.

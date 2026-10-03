@@ -50,13 +50,14 @@ The [`examples/`](examples/) folder has explainers for three real pull requests,
 you can see the output without running anything. Download an `index.html` and open it in a
 browser.
 
-| Example                                                        | PR                                                                 | What it shows                                                               |
-| -------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| [`ky-880-signal-replace`](examples/ky-880-signal-replace/)     | [sindresorhus/ky#880](https://github.com/sindresorhus/ky/pull/880) | A small fix (4 files) with one cited low-severity edge case                 |
-| [`click-3777-pager-params`](examples/click-3777-pager-params/) | [pallets/click#3777](https://github.com/pallets/click/pull/3777)   | A Python change where the explainer finds a color regression for `LESS=FRX` |
-| [`ky-842-network-error`](examples/ky-842-network-error/)       | [sindresorhus/ky#842](https://github.com/sindresorhus/ky/pull/842) | A 15-file feature with a breaking change, flow diagram, and six checks      |
+| Example                                                        | PR                                                                 | What it shows                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`ky-880-signal-replace`](examples/ky-880-signal-replace/)     | [sindresorhus/ky#880](https://github.com/sindresorhus/ky/pull/880) | A small fix (4 files) where the explainer finds a regression for `signal: undefined` |
+| [`click-3777-pager-params`](examples/click-3777-pager-params/) | [pallets/click#3777](https://github.com/pallets/click/pull/3777)   | A Python change where the explainer finds a color regression for `LESS=FRX`          |
+| [`ky-842-network-error`](examples/ky-842-network-error/)       | [sindresorhus/ky#842](https://github.com/sindresorhus/ky/pull/842) | A 15-file feature with a breaking change, flow diagram, and seven checks             |
 
-See [`examples/README.md`](examples/README.md) for how they were made.
+The answers come from live runs of the CLI against `claude-opus-5-5`. See
+[`examples/README.md`](examples/README.md) for how they were made.
 
 <p align="center">
   <img alt="Risks section: severity badges, file and line links, and failure mechanisms" src="docs/images/risks-light.png" width="720">
@@ -94,15 +95,17 @@ lucidiff render explainer.json --open                   # render saved JSON to H
 | `--verbose`              | Print debug details: redaction counts, dropped risks with reasons, raw model output.                |
 
 lucidiff shows a progress line per stage (on stderr, so `--json` output stays clean) and
-prints the token usage at the end. For example (timings and token counts vary by PR and model):
+prints the token usage at the end. This is a live run on the diff of one of the
+[examples](#examples) (timings and token counts vary by PR and model):
 
 ```
-✔ Loading changes pallets/click#3777: 3 files 0.8s
-✔ Filtering and redacting 3 files to analyze, 0 skipped, 0 secrets redacted 1.1s
-✔ Analyzing with claude-opus-5-5 1 model call 38.4s
-✔ Validating citations and diagram 3 risks, 4 checks 0.1s
-✔ Rendering HTML pallets-click-3777.explainer.html 0.0s
-Tokens: 21,940 input · 2,875 output · 1 model call (claude-opus-5-5)
+$ lucidiff examples/click-3777-pager-params/pr.diff -o .sample/live/click-3777-pager-params.html
+✔ Loading changes pr.diff: 3 files 0.0s
+✔ Filtering and redacting 3 files to analyze, 0 skipped, 0 secrets redacted 0.0s
+✔ Analyzing with claude-opus-5-5 1 model call 36.6s
+✔ Validating citations and diagram 3 risks, 6 checks 0.4s
+✔ Rendering HTML .sample/live/click-3777-pager-params.html 0.1s
+Tokens: 11,119 input · 3,521 output · 1 model call (claude-opus-5-5)
 ```
 
 ## Library usage

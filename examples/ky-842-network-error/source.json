@@ -9,6 +9,11 @@
   "author": null,
   "commit": "eaf0b80b23b7b85e4040f525a12521d727395420",
   "license": "MIT",
-  "model": "claude-opus-5-5",
-  "generated_at": "2026-10-02T20:00:00.000Z"
+  "run": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "generated_at": "2026-10-02T21:08:19.669Z",
+    "input_tokens": 21839,
+    "output_tokens": 4355
+  }
 }

@@ -7,43 +7,61 @@ text list instead.
 
 | Folder                                                | Pull request                                                                                                                              | Size               | Highlights                                                                                        |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
-| [`ky-880-signal-replace`](ky-880-signal-replace/)     | [sindresorhus/ky#880](https://github.com/sindresorhus/ky/pull/880): Fix `signal` replacement when extending instances                     | 4 files, +79 −7    | A small fix. One low risk: `signal: null` still inherits the parent signal.                       |
-| [`click-3777-pager-params`](click-3777-pager-params/) | [pallets/click#3777](https://github.com/pallets/click/pull/3777): Forward all user's parameters set in `PAGER` and improve flag detection | 3 files, +227 −12  | A medium risk: a dashless `LESS=FRX` (Git's default) no longer keeps colors.                      |
+| [`ky-880-signal-replace`](ky-880-signal-replace/)     | [sindresorhus/ky#880](https://github.com/sindresorhus/ky/pull/880): Fix `signal` replacement when extending instances                     | 4 files, +79 −7    | A medium risk: a per-request `signal: undefined` now drops the instance's signal.                 |
+| [`click-3777-pager-params`](click-3777-pager-params/) | [pallets/click#3777](https://github.com/pallets/click/pull/3777): Forward all user's parameters set in `PAGER` and improve flag detection | 3 files, +227 −12  | A medium risk: a dashless `LESS=FRX` (Git's default) no longer keeps colors. Two low risks.       |
 | [`ky-842-network-error`](ky-842-network-error/)       | [sindresorhus/ky#842](https://github.com/sindresorhus/ky/pull/842): Add `NetworkError` class and tighten retry logic                      | 15 files, +397 −47 | A breaking change for callers that check `TypeError`, and lost retries for custom `fetch` errors. |
 
 Each folder contains:
 
-| File                | Contents                                                                |
-| ------------------- | ----------------------------------------------------------------------- |
-| `source.json`       | The PR URL, title, base branch, merge commit, and the project's license |
-| `pr.diff`           | The PR diff, as `git diff` prints it for the PR's commits               |
-| `model-output.json` | The model's answer: JSON that matches `ExplanationSchema`               |
-| `explainer.json`    | The validated explainer document (generated)                            |
-| `index.html`        | The rendered page (generated)                                           |
+| File                | Contents                                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source.json`       | The PR URL, title, base branch, merge commit, and the project's license, and `run`: the provider, model, time, and token usage of the live call |
+| `pr.diff`           | The PR diff, as `git diff` prints it for the PR's commits                                                                                       |
+| `model-output.json` | The model's answer: JSON that matches `ExplanationSchema`                                                                                       |
+| `explainer.json`    | The validated explainer document (generated)                                                                                                    |
+| `index.html`        | The rendered page (generated)                                                                                                                   |
 
 ## How these were made
 
-The diffs come from the projects' public git history. The explanations in
-`model-output.json` were written by `claude-opus-5-5` following lucidiff's system prompt, in
-the development session that built lucidiff. That environment had no provider API key, so the
-answers were not produced by running the `lucidiff` CLI against the API. The page footers say so:
-the provider reads `replay` and token usage reads "Not reported".
+The diffs come from the projects' public git history. Each `model-output.json` is the answer
+from a live run of the CLI on that `pr.diff` against the Anthropic API, on 2026-10-02:
 
-Every other step is the real pipeline. `pnpm examples` replays the stored answers through
-`explain()`: the diff parser, change merging, risk citation validation (no risk was dropped),
-flow validation and compilation to Mermaid, checklist cleanup, schema validation, and the
-renderer. Each risk was also checked by running the PR's own code; for example,
-`_less_uses_raw_mode("FRX", [])` returns `False` at the PR's head commit.
+```sh
+lucidiff examples/<name>/pr.diff --verbose
+```
 
-To regenerate them with a live model call, set a provider key and run:
+The model was `claude-opus-5-5`, the default, with no PR description and no full-file context,
+because the input was a diff file. Token usage is in `source.json` and in each page footer.
+No risk was dropped by citation validation, and no flow diagram needed a repair call.
+
+`pnpm examples` replays the stored answers through the same pipeline: the diff parser, change
+merging, risk citation validation, flow validation and compilation to Mermaid, checklist
+cleanup, schema validation, and the renderer. It needs no API key, so the pages can be
+regenerated after renderer changes. The replay adds the PR's title and link from
+`source.json` to the page header.
+
+Each risk was checked against the PR's own code:
+
+- **ky#880.** At the PR's merge commit, `ky.create({signal}).get(url, {signal: undefined})`
+  sends a request whose signal does not abort with the instance's signal. Before the PR, it
+  did.
+- **click#3777.** `_less_uses_raw_mode("FRX", [])` returns `False`, so `LESS=FRX` loses
+  colors. `("", ["--raw"])` returns `False`, although less accepts `--raw`. `("-+R", [])` and
+  `("-pError", [])` return `True`, which are false positives.
+- **ky#842.** A `fetch` that throws `TypeError` now reaches the caller as `NetworkError`,
+  which is not an `instanceof TypeError`. A custom `fetch` that throws a plain `Error` is
+  called once with `retry: {limit: 2}`, not three times as before. `isNetworkError` returns
+  `true` for `new DOMException('offline', 'NetworkError')`.
+
+To get new answers from a live model, set a provider key and run:
 
 ```sh
 pnpm build
 node scripts/generate-examples.mjs --live
 ```
 
-Live runs fetch each PR from the GitHub API, including full file contents, so the results will
-differ from the committed replays.
+This sends each `pr.diff` to the model, as the command above does, saves the answer and its
+token usage, and replays it. Model output varies between runs, so the risks can differ.
 
 ## Licenses
 

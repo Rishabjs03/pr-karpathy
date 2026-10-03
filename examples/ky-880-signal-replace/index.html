@@ -6,7 +6,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;sha256-G3Y8W3yR7qO0Df2oHUgzTju4T2B7S47RLHZ7OHNzpRo=&#39; &#39;sha256-6hPih1DKiVf1uoatEi1z78uH0BaSRHPhWI7gmH3eAzc=&#39; https://cdn.jsdelivr.net; style-src &#39;unsafe-inline&#39;; img-src data:; font-src data:; base-uri &#39;none&#39;; form-action &#39;none&#39;" />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="This PR fixes how .extend() handles the signal option. Before, deepMergeInternal always merged the parent signal back in, even when the child used replaceOption(signal) or signal: undefined. Now a rep" />
+    <meta name="description" content="After this change, .extend() callers can drop signals inherited from a parent instance. signal: replaceOption(newSignal) replaces the parent signals, and signal: undefined removes them. Signal merging" />
     <meta name="generator" content="lucidiff" />
     <title>Let .extend() replace or remove inherited abort signals · lucidiff</title>
     <script>// Runs in <head> before first paint, so a saved theme choice never flashes the other theme.
@@ -1443,7 +1443,7 @@ a.location {
                 >
               </li><li>
                 <a href="#tests" data-nav="tests"
-                  >Tests<span class="nav-count">4</span></a
+                  >Tests<span class="nav-count">5</span></a
                 >
               </li>
         </ul>
@@ -1470,7 +1470,7 @@ a.location {
     </div>
   </header> <section class="section" id="summary" aria-labelledby="summary-title">
     <h2 id="summary-title">Summary</h2>
-    <div class="prose summary"><p>This PR fixes how <code class="nowrap">.extend()</code> handles the <code class="nowrap">signal</code> option. Before, <code class="nowrap">deepMergeInternal</code> always merged the parent signal back in, even when the child used <code class="nowrap">replaceOption(signal)</code> or <code class="nowrap">signal: undefined</code>. Now a replaced or <code class="nowrap">undefined</code> root-level <code class="nowrap">signal</code> discards the inherited signals.</p><p>The PR also limits signal collection to the root options. A <code class="nowrap">signal</code> key inside nested data, such as a <code class="nowrap">json</code> body, now merges like any other value. The readme and the <code class="nowrap">extend</code> type docs describe the new behavior.</p></div>
+    <div class="prose summary"><p>After this change, <code class="nowrap">.extend()</code> callers can drop signals inherited from a parent instance. <code>signal: replaceOption(newSignal)</code> replaces the parent signals, and <code class="nowrap">signal: undefined</code> removes them. Signal merging also now applies only to the root <code class="nowrap">signal</code> option. A nested key such as <code class="nowrap">json.signal</code> no longer gets pulled into the request signal.</p><p>In <code class="nowrap">deepMergeInternal</code>, a root <code class="nowrap">signal</code> key that is a replace marker or <code class="nowrap">undefined</code> empties the collected <code class="nowrap">signals</code> array. AbortSignal collection now requires <code class="nowrap">isRoot</code>. The readme and the <code class="nowrap">KyInstance.extend</code> JSDoc document the new behavior. Tests cover replace, removal, the nested JSON case, and an extra check that instance signals still combine with request signals.</p></div>
     <ul class="glance" aria-label="At a glance">
       <li>
         <a href="#changes"
@@ -1479,14 +1479,14 @@ a.location {
         >
       </li>
       <li>
-        <a href="#risks" class="glance-low"
+        <a href="#risks" class="glance-medium"
           ><span class="glance-value">1 risk</span
-          ><span class="glance-label">low only</span></a
+          ><span class="glance-label">1 medium</span></a
         >
       </li>
       <li>
         <a href="#tests"
-          ><span class="glance-value">4 checks</span
+          ><span class="glance-value">5 checks</span
           ><span class="glance-label">to verify</span></a
         >
       </li>
@@ -1512,18 +1512,18 @@ a.location {
           ><span class="add">+12</span>
           <span class="del">−7</span></span
         >
-        <span class="change-preview"><code class="nowrap">deepMergeInternal</code> now unwraps <code class="nowrap">replaceOption</code> before it handles <code class="nowrap">signal</code>. At the root level, a replaced or <code class="nowrap">undefined</code> <code class="nowrap">signal</code> empties the <code class="nowrap">signals</code> list. Only root-level <code class="nowrap">AbortSignal</code> values go into <code class="nowrap">signals</code>. A comment typo is also fixed.</span>
+        <span class="change-preview"><code class="nowrap">deepMergeInternal</code> now unwraps <code class="nowrap">replaceOption</code> before signal handling. It clears <code class="nowrap">signals</code> when the root <code class="nowrap">signal</code> is a replace marker or <code class="nowrap">undefined</code>. It pushes AbortSignals only when <code class="nowrap">isRoot &amp;&amp; key === &#39;signal&#39;</code>. A typo in a comment is also fixed.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd><code class="nowrap">deepMergeInternal</code> now unwraps <code class="nowrap">replaceOption</code> before it handles <code class="nowrap">signal</code>. At the root level, a replaced or <code class="nowrap">undefined</code> <code class="nowrap">signal</code> empties the <code class="nowrap">signals</code> list. Only root-level <code class="nowrap">AbortSignal</code> values go into <code class="nowrap">signals</code>. A comment typo is also fixed.</dd>
+                  <dd><code class="nowrap">deepMergeInternal</code> now unwraps <code class="nowrap">replaceOption</code> before signal handling. It clears <code class="nowrap">signals</code> when the root <code class="nowrap">signal</code> is a replace marker or <code class="nowrap">undefined</code>. It pushes AbortSignals only when <code class="nowrap">isRoot &amp;&amp; key === &#39;signal&#39;</code>. A typo in a comment is also fixed.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>This is the fix. Before, the parent signal stayed in <code class="nowrap">signals</code> and overwrote the child value at the end of the merge. <code>.extend({signal: replaceOption(s)})</code> now uses only <code class="nowrap">s</code>, and <code class="nowrap">.extend({signal: undefined})</code> removes the signal.</dd>
+                        <dd>Inherited signals can now be replaced or removed. Nested <code class="nowrap">signal</code> properties, for example inside <code class="nowrap">json</code>, now go through the normal merge path instead of being hoisted into the request signal.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/880/files#diff-1f3f1e353e97815fe3000f5bcfa12ce7b6a7d2af95ff4f0069cfb6d82bc0b6df" rel="noopener noreferrer" target="_blank"
@@ -1543,52 +1543,21 @@ a.location {
           ><span class="add">+63</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds tests for <code class="nowrap">replaceOption(signal)</code>, for <code class="nowrap">signal: undefined</code>, and for a <code class="nowrap">signal</code> key inside <code class="nowrap">json</code>. Extends the signal-merging test to abort through the instance signal.</span>
+        <span class="change-preview">Extends the signal-merge test so an instance signal aborts a request that has its own signal. Adds three tests: replace via <code class="nowrap">replaceOption</code>, removal via <code class="nowrap">signal: undefined</code>, and nested <code class="nowrap">json.signal</code> handling.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds tests for <code class="nowrap">replaceOption(signal)</code>, for <code class="nowrap">signal: undefined</code>, and for a <code class="nowrap">signal</code> key inside <code class="nowrap">json</code>. Extends the signal-merging test to abort through the instance signal.</dd>
+                  <dd>Extends the signal-merge test so an instance signal aborts a request that has its own signal. Adds three tests: replace via <code class="nowrap">replaceOption</code>, removal via <code class="nowrap">signal: undefined</code>, and nested <code class="nowrap">json.signal</code> handling.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The tests cover each branch of the new root-signal logic in <code class="nowrap">deepMergeInternal</code>.</dd>
+                        <dd>Covers the new clear and replace paths and the root-only scope.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/880/files#diff-d6e571bd4c1e3e899e3117820150c73a7742af5bddd609d15653f2217d762239" rel="noopener noreferrer" target="_blank"
-                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
-              >
-      </div>
-    </details>
-  </li><li>
-    <details class="change" open>
-      <summary>
-        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="kind kind-modified">Modified</span>
-        <span class="path mono" title="source/types/ky.ts"
-    ><span class="path-dir">source/types/</span><span class="path-base">ky.ts</span></span
-  >
-        <span class="mono diffstat"
-          ><span class="add">+2</span>
-          <span class="del">−0</span></span
-        >
-        <span class="change-preview">Adds one paragraph to the <code class="nowrap">extend</code> JSDoc: signals are combined, and <code class="nowrap">replaceOption(signal)</code> or <code class="nowrap">signal: undefined</code> replaces or removes them.</span>
-      </summary>
-      <div class="change-body">
-        
-        <dl>
-                <div>
-                  <dt>What</dt>
-                  <dd>Adds one paragraph to the <code class="nowrap">extend</code> JSDoc: signals are combined, and <code class="nowrap">replaceOption(signal)</code> or <code class="nowrap">signal: undefined</code> replaces or removes them.</dd>
-                </div>
-                <div>
-                        <dt>Why</dt>
-                        <dd>Editors show this text, so users find the new behavior where they write the call.</dd>
-                      </div>
-              </dl>
-        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/880/files#diff-78abbe1626f70a203a3037d1e8632054f00e5aba3df3ae8ca2ca78e28557028b" rel="noopener noreferrer" target="_blank"
                 >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
               >
       </div>
@@ -1605,21 +1574,52 @@ a.location {
           ><span class="add">+2</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds the same paragraph to the <code class="nowrap">.extend()</code> section.</span>
+        <span class="change-preview">Adds a sentence on signal combining, <code class="nowrap">replaceOption(signal)</code>, and <code class="nowrap">signal: undefined</code> under <code class="nowrap">.extend()</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds the same paragraph to the <code class="nowrap">.extend()</code> section.</dd>
+                  <dd>Adds a sentence on signal combining, <code class="nowrap">replaceOption(signal)</code>, and <code class="nowrap">signal: undefined</code> under <code class="nowrap">.extend()</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Keeps the readme and the type docs in sync.</dd>
+                        <dd>Documentation only.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/880/files#diff-5a831ea67cf5cf8703b0de46901ab25bd191f56b320053be9332d9a3b0d01d15" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" open>
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/types/ky.ts"
+    ><span class="path-dir">source/types/</span><span class="path-base">ky.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+2</span>
+          <span class="del">−0</span></span
+        >
+        <span class="change-preview">Adds the same sentence to the <code class="nowrap">KyInstance</code> <code class="nowrap">.extend()</code> JSDoc.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Adds the same sentence to the <code class="nowrap">KyInstance</code> <code class="nowrap">.extend()</code> JSDoc.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Documentation only; no type changes.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/880/files#diff-78abbe1626f70a203a3037d1e8632054f00e5aba3df3ae8ca2ca78e28557028b" rel="noopener noreferrer" target="_blank"
                 >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
               >
       </div>
@@ -1634,7 +1634,7 @@ a.location {
                       data-flow-diagram
                       data-state="loading"
                       role="img"
-                      aria-label="`.extend()` merges parent and child options in `deepMergeInternal`. At the root level, it collects each `AbortSignal` in `signals`, and a replaced or `undefined` signal empties the list. `AbortSignal.any` combines what remains."
+                      aria-label="`.extend()` and request options pass through `deepMergeInternal`. Root `signal` values are collected, cleared, or replaced, then combined into `returnValue.signal`."
                     >
                       <p class="flow-status muted" data-flow-status>Rendering diagram…</p>
                     </div>
@@ -1646,7 +1646,7 @@ a.location {
                         ><span class="swatch swatch-context"></span>Unchanged context</span
                       >
                     </div>
-            <figcaption><code class="nowrap">.extend()</code> merges parent and child options in <code class="nowrap">deepMergeInternal</code>. At the root level, it collects each <code class="nowrap">AbortSignal</code> in <code class="nowrap">signals</code>, and a replaced or <code class="nowrap">undefined</code> signal empties the list. <code class="nowrap">AbortSignal.any</code> combines what remains.</figcaption>
+            <figcaption><code class="nowrap">.extend()</code> and request options pass through <code class="nowrap">deepMergeInternal</code>. Root <code class="nowrap">signal</code> values are collected, cleared, or replaced, then combined into <code class="nowrap">returnValue.signal</code>.</figcaption>
             <details class="flow-text" data-flow-text >
     <summary>Components and connections</summary>
     <div class="flow-text-body">
@@ -1655,20 +1655,12 @@ a.location {
         <ul>
           <li>
                 <span class="flow-node-name "
-                  >ky.extend()</span
+                  >ky.extend / request call</span
                 >
                 <span class="muted"
                   >entry point</span
                 >
                 
-              </li><li>
-                <span class="flow-node-name "
-                  >replaceOption()</span
-                >
-                <span class="muted"
-                  >function</span
-                >
-                <code>source/utils/merge.ts</code>
               </li><li>
                 <span class="flow-node-name is-changed"
                   >deepMergeInternal</span
@@ -1679,7 +1671,7 @@ a.location {
                 <code>source/utils/merge.ts</code>
               </li><li>
                 <span class="flow-node-name is-changed"
-                  >signals list</span
+                  >signals array</span
                 >
                 <span class="muted"
                   >data, changed</span
@@ -1687,12 +1679,12 @@ a.location {
                 <code>source/utils/merge.ts</code>
               </li><li>
                 <span class="flow-node-name "
-                  >AbortSignal.any</span
+                  >returnValue.signal (AbortSignal.any or last)</span
                 >
                 <span class="muted"
-                  >external service</span
+                  >data</span
                 >
-                
+                <code>source/utils/merge.ts</code>
               </li>
         </ul>
       </div>
@@ -1700,17 +1692,14 @@ a.location {
         <h3>Connections</h3>
         <ul>
                 <li>
-                      ky.extend() → deepMergeInternal
-                      <span class="muted">(parent and child options)</span>
+                      ky.extend / request call → deepMergeInternal
+                      <span class="muted">(option sources)</span>
                     </li><li>
-                      replaceOption() → deepMergeInternal
-                      <span class="muted">(wrapped signal)</span>
+                      deepMergeInternal → signals array
+                      <span class="muted">(push / clear root signal)</span>
                     </li><li>
-                      deepMergeInternal → signals list
-                      <span class="muted">(push or empty)</span>
-                    </li><li>
-                      signals list → AbortSignal.any
-                      <span class="muted">(two or more signals)</span>
+                      signals array → returnValue.signal (AbortSignal.any or last)
+                      <span class="muted">(combine)</span>
                     </li>
               </ul>
       </div>
@@ -1721,18 +1710,18 @@ a.location {
       <section class="section" id="risks" aria-labelledby="risks-title">
     <div class="section-head">
       <h2 id="risks-title">Risks</h2>
-      <p class="section-note">0 high · 0 medium · 1 low</p>
+      <p class="section-note">0 high · 1 medium · 0 low</p>
     </div>
     <ol class="risk-list">
-            <li class="risk severity-low" id="risk-r_a0e6260466">
+            <li class="risk severity-medium" id="risk-r_413772b171">
     <div class="risk-head">
-      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
-      <h3 class="risk-title"><code class="nowrap">signal: null</code> still inherits the parent signal</h3>
+      <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
+      <h3 class="risk-title">Per-request <code class="nowrap">signal: undefined</code> now drops instance signal</h3>
     </div>
     <a class="location mono" href="https://github.com/sindresorhus/ky/pull/880/files#diff-1f3f1e353e97815fe3000f5bcfa12ce7b6a7d2af95ff4f0069cfb6d82bc0b6dfR227-R230" rel="noopener noreferrer" target="_blank"
         >source/utils/merge.ts:227–230 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">Line 228 empties <code class="nowrap">signals</code> only for <code class="nowrap">replaceOption</code> or <code class="nowrap">undefined</code>. With <code class="nowrap">signal: null</code>, line 285 stores <code class="nowrap">null</code>, and lines 312-322 then replace it with the parent signal. <code class="nowrap">searchParams: null</code> and <code class="nowrap">context: null</code> remove their values, so callers can expect the same here.</p>
+    <p class="risk-reason">The clear applies to any root-level merge, not only <code class="nowrap">.extend()</code>. The existing test shows request options merge with instance signals through this path. A call like <code>api.get(url, {signal: opts.signal})</code> with an undefined <code class="nowrap">opts.signal</code> now empties <code class="nowrap">signals</code>. That silently discards the instance-level signal. The old code ignored a non-AbortSignal value here and kept the instance signal.</p>
   </li>
           </ol>
   </section> <section class="section" id="tests" aria-labelledby="tests-title">
@@ -1740,7 +1729,7 @@ a.location {
       <h2 id="tests-title">Test checklist</h2>
       <div class="section-tools">
               <span class="section-note" data-check-progress aria-live="polite"
-                >0 of 4 done</span
+                >0 of 5 done</span
               >
               <button type="button" class="text-button" data-check-reset>Reset</button>
             </div>
@@ -1751,36 +1740,45 @@ a.location {
             <ul class="checklist">
               <li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_47eb7777c7" />
+                      <input type="checkbox" data-check-id="t_98397e41f5" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Call <code>ky.create({signal: a.signal}).extend({signal: null})</code>, abort <code class="nowrap">a</code>, and check whether the request aborts. Decide if <code class="nowrap">null</code> should remove the signal like <code class="nowrap">undefined</code>.</span>
+                      <span class="check-text">Create <code class="nowrap">ky.create({signal: s})</code>, abort <code class="nowrap">s</code>, then call <code>api.get(url, {signal: undefined})</code>. Confirm whether the request still aborts. The old code aborts it; the new code does not.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/utils/merge.ts">merge.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_5642beeca9" />
+                      <input type="checkbox" data-check-id="t_040af7e933" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Chain <code>base.extend({signal: replaceOption(b.signal)}).extend({signal: c.signal})</code>. Abort <code class="nowrap">b</code>, then <code class="nowrap">c</code>, and confirm each one aborts the request and the base signal does not.</span>
+                      <span class="check-text">Run <code class="nowrap">test/main.ts</code> and confirm the three new tests pass, plus the extended &#39;merges signals from instance and request options&#39; test.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
-                            <li><code title="source/utils/merge.ts">merge.ts</code></li><li><code title="test/main.ts">main.ts</code></li>
+                            <li><code title="test/main.ts">main.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_53450aabe0" />
+                      <input type="checkbox" data-check-id="t_3f1dc6e6c1" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Pass <code>signal: replaceOption(undefined)</code> to <code class="nowrap">.extend()</code> and confirm the parent signal no longer aborts the request.</span>
+                      <span class="check-text">Chain <code>ky.create({signal: a}).extend({signal: replaceOption(b)}).extend({signal: c})</code>. Abort <code class="nowrap">a</code> and confirm no abort. Then abort <code class="nowrap">c</code> and confirm an abort.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/utils/merge.ts">merge.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_70e5bfd959" />
+                      <input type="checkbox" data-check-id="t_f374e9136e" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Send a POST with <code class="nowrap">json: {signal: &#39;x&#39;}</code> through an extended instance and confirm the server receives <code class="nowrap">{&quot;signal&quot;: &quot;x&quot;}</code> unchanged.</span>
+                      <span class="check-text">Merge <code>json: {signal: someAbortSignal}</code> into an instance that has no prior <code class="nowrap">json</code>. Confirm the request body and the request signal match expectations, since nested signals now take the generic merge path.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/utils/merge.ts">merge.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_cfd852a437" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Run the tests where <code class="nowrap">AbortSignal.any</code> is unavailable. Confirm that <code class="nowrap">replaceOption(signal)</code> still yields the replacement as <code class="nowrap">signals.at(-1)</code>.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/utils/merge.ts">merge.ts</code></li>
@@ -1798,16 +1796,16 @@ a.location {
             <dd><code>claude-opus-5-5</code></dd>
           </div><div>
             <dt>Provider</dt>
-            <dd>replay</dd>
+            <dd>anthropic</dd>
           </div><div>
             <dt>Generated</dt>
-            <dd><time datetime="2026-10-02T20:00:00.000Z">2026-10-02 20:00 UTC</time></dd>
+            <dd><time datetime="2026-10-02T21:08:04.845Z">2026-10-02 21:08 UTC</time></dd>
           </div><div>
             <dt>Analysis</dt>
             <dd>1 model call</dd>
           </div><div>
             <dt>Tokens</dt>
-            <dd>Not reported</dd>
+            <dd>7,424 in · 2,442 out</dd>
           </div><div>
             <dt>Files analyzed</dt>
             <dd>4 of 4</dd>
@@ -1825,7 +1823,7 @@ a.location {
     </p>
   </footer>
     </main>
-    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/sindresorhus/ky/pull/880","mermaid":"flowchart LR\n  n_extend([\"ky.extend#40;#41;\"])\n  n_replace_option(\"replaceOption#40;#41;\")\n  n_deep_merge(\"deepMergeInternal\")\n  n_signals[(\"signals list\")]\n  n_abort_any{{\"AbortSignal.any\"}}\n  n_extend -->|\"parent and child options\"| n_deep_merge\n  n_replace_option -->|\"wrapped signal\"| n_deep_merge\n  n_deep_merge -->|\"push or empty\"| n_signals\n  n_signals -->|\"two or more signals\"| n_abort_any\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_deep_merge,n_signals changed\n  class n_extend,n_replace_option,n_abort_any context"}</script>
+    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/sindresorhus/ky/pull/880","mermaid":"flowchart LR\n  n_extend([\"ky.extend / request call\"])\n  n_deep_merge(\"deepMergeInternal\")\n  n_signals[(\"signals array\")]\n  n_result_signal[(\"returnValue.signal #40;AbortSignal.any or last#41;\")]\n  n_extend -->|\"option sources\"| n_deep_merge\n  n_deep_merge -->|\"push / clear root signal\"| n_signals\n  n_signals -->|\"combine\"| n_result_signal\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_deep_merge,n_signals changed\n  class n_extend,n_result_signal context"}</script>
     <script>// Page behavior for the generated explainer. Plain browser JavaScript, no dependencies.
 //
 // 1. Theme toggle (light/dark), saved in localStorage.

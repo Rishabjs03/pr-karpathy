@@ -1,14 +1,16 @@
 /**
  * Regenerates the committed examples in examples/<name>/. Run `pnpm build` first.
  *
- *   pnpm examples            Replay: run the stored model output (model-output.json) through
+ *   pnpm examples            Replay: run the stored model answer (model-output.json) through
  *                            the real pipeline again (citation checks, flow compile, render).
  *                            No API key or network needed. Use this after renderer changes.
- *   pnpm examples --live     Call the model for real on each PR URL. Needs a provider key and
- *                            GitHub access, and overwrites model-output.json.
+ *   pnpm examples --live     Send each pr.diff to the model, as `lucidiff pr.diff` does, then
+ *                            replay the new answer. Needs a provider key. Overwrites
+ *                            model-output.json and the `run` record in source.json.
  *
  * Each example folder holds:
- *   source.json         The PR: URL, title, base branch, commit, and license of the project.
+ *   source.json         The PR (URL, title, base branch, commit, project license) and `run`,
+ *                       the provider, model, time, and token usage of the live call.
  *   pr.diff             The PR diff, as `git diff` prints it.
  *   model-output.json   The model's answer (the ExplanationSchema JSON).
  *   explainer.json      The validated explainer document (generated).
@@ -24,12 +26,12 @@ const live = process.argv.includes('--live');
 const only = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 const root = path.resolve('examples');
 
-/** A model that "answers" with a stored response and reports no token usage. */
-function replayModel(output, modelId) {
+/** A model that "answers" with a stored response and reports the live call's token usage. */
+function replayModel(output, run) {
   const text = JSON.stringify(output);
   return new MockLanguageModelV4({
-    provider: 'replay',
-    modelId,
+    provider: run.provider,
+    modelId: run.model,
     doStream: async (options) => {
       // A flow repair call gets the stored flow; every other call gets the full answer.
       const isRepair = options.responseFormat?.name === 'flow_graph';
@@ -45,8 +47,13 @@ function replayModel(output, modelId) {
               type: 'finish',
               finishReason: { unified: 'stop', raw: 'stop' },
               usage: {
-                inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 },
-                outputTokens: { total: 0, text: 0, reasoning: 0 },
+                inputTokens: {
+                  total: run.input_tokens,
+                  noCache: run.input_tokens,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                },
+                outputTokens: { total: run.output_tokens, text: run.output_tokens, reasoning: 0 },
               },
             });
             controller.close();
@@ -83,8 +90,43 @@ async function replay(dir, source) {
   };
   return explain(
     { kind: 'loaded', loaded },
-    { model: replayModel(output, source.model), now: () => new Date(source.generated_at) },
+    { model: replayModel(output, source.run), now: () => new Date(source.run.generated_at) },
   );
+}
+
+/**
+ * Sends pr.diff to the configured model, as `lucidiff pr.diff` does. Returns the model's answer
+ * and a record of the call. If the flow needed a repair call, the answer gets the repaired flow,
+ * so the replay renders what the live run rendered.
+ */
+async function liveAnswer(dir) {
+  const diff = await readFile(path.join(dir, 'pr.diff'), 'utf8');
+  const raw = {};
+  const { document } = await explain(
+    { kind: 'diff', diff, label: 'pr.diff' },
+    {
+      onDebug: (message) => {
+        const match = /^Raw response \((\w+)(?:, retry)?\):\n/.exec(message);
+        if (match) raw[match[1]] = message.slice(match[0].length);
+      },
+    },
+  );
+  if (document.meta.mode !== 'single' || !raw.pr_explanation) {
+    throw new Error(`${dir}: expected a single-call answer, got mode ${document.meta.mode}`);
+  }
+  const output = JSON.parse(raw.pr_explanation);
+  if (raw.flow_graph) output.flow = JSON.parse(raw.flow_graph);
+  const { meta } = document;
+  return {
+    output,
+    run: {
+      provider: meta.provider,
+      model: meta.model,
+      generated_at: meta.generated_at,
+      input_tokens: meta.usage.input_tokens,
+      output_tokens: meta.usage.output_tokens,
+    },
+  };
 }
 
 const names = (await readdir(root, { withFileTypes: true }))
@@ -95,11 +137,15 @@ const names = (await readdir(root, { withFileTypes: true }))
 let failures = 0;
 for (const name of names) {
   const dir = path.join(root, name);
-  const source = JSON.parse(await readFile(path.join(dir, 'source.json'), 'utf8'));
-  const result = live
-    ? await explain({ kind: 'github', url: source.url })
-    : await replay(dir, source);
-  const { document, droppedRisks, warnings } = result;
+  const sourceFile = path.join(dir, 'source.json');
+  const source = JSON.parse(await readFile(sourceFile, 'utf8'));
+  if (live) {
+    const { output, run } = await liveAnswer(dir);
+    await writeFile(path.join(dir, 'model-output.json'), `${JSON.stringify(output, null, 2)}\n`);
+    source.run = run;
+    await writeFile(sourceFile, `${JSON.stringify(source, null, 2)}\n`);
+  }
+  const { document, droppedRisks, warnings } = await replay(dir, source);
 
   await writeFile(path.join(dir, 'explainer.json'), `${JSON.stringify(document, null, 2)}\n`);
   // Examples load the pinned Mermaid build from the CDN. Embedding it (--offline) would add

@@ -6,9 +6,9 @@
     <meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;sha256-G3Y8W3yR7qO0Df2oHUgzTju4T2B7S47RLHZ7OHNzpRo=&#39; &#39;sha256-6hPih1DKiVf1uoatEi1z78uH0BaSRHPhWI7gmH3eAzc=&#39; https://cdn.jsdelivr.net; style-src &#39;unsafe-inline&#39;; img-src data:; font-src data:; base-uri &#39;none&#39;; form-action &#39;none&#39;" />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Failed fetch calls now reject with a new NetworkError instead of the runtime&#39;s raw TypeError. #fetch wraps the error only when isRawNetworkError recognizes its message, and keeps the original error in" />
+    <meta name="description" content="Ky now throws a new NetworkError (a KyError subclass) when fetch fails with a recognized network failure. Previously callers got the raw TypeError. The original error is on error.cause. The PR exports" />
     <meta name="generator" content="lucidiff" />
-    <title>Wrap fetch network failures in NetworkError and stop retrying unknown errors · lucidiff</title>
+    <title>Wrap fetch network failures in a new NetworkError and stop retrying unknown errors · lucidiff</title>
     <script>// Runs in <head> before first paint, so a saved theme choice never flashes the other theme.
 (function () {
   try {
@@ -1443,7 +1443,7 @@ a.location {
                 >
               </li><li>
                 <a href="#tests" data-nav="tests"
-                  >Tests<span class="nav-count">6</span></a
+                  >Tests<span class="nav-count">7</span></a
                 >
               </li>
         </ul>
@@ -1458,7 +1458,7 @@ a.location {
     <p class="eyebrow"><a href="https://github.com/sindresorhus/ky/pull/842" rel="noopener noreferrer" target="_blank"
         >sindresorhus/ky#842 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       ></p>
-    <h1>Wrap fetch network failures in <code class="nowrap">NetworkError</code> and stop retrying unknown errors</h1>
+    <h1>Wrap fetch network failures in a new <code class="nowrap">NetworkError</code> and stop retrying unknown errors</h1>
     <div class="hero-meta">
       
       <span>15 files changed</span>
@@ -1470,7 +1470,7 @@ a.location {
     </div>
   </header> <section class="section" id="summary" aria-labelledby="summary-title">
     <h2 id="summary-title">Summary</h2>
-    <div class="prose summary"><p>Failed <code class="nowrap">fetch</code> calls now reject with a new <code class="nowrap">NetworkError</code> instead of the runtime&#39;s raw <code class="nowrap">TypeError</code>. <code class="nowrap">#fetch</code> wraps the error only when <code class="nowrap">isRawNetworkError</code> recognizes its message, and keeps the original error in <code class="nowrap">cause</code>.</p><p>The retry rule is also narrower. <code class="nowrap">#calculateRetryDelay</code> now retries timeouts (with <code class="nowrap">retryOnTimeout</code>), listed HTTP status codes, and <code class="nowrap">NetworkError</code>. Any other error is thrown at once, so programming bugs no longer cause retries. Both changes alter what callers catch, and the PR updates existing tests to match.</p></div>
+    <div class="prose summary"><p>Ky now throws a new <code class="nowrap">NetworkError</code> (a <code class="nowrap">KyError</code> subclass) when <code class="nowrap">fetch</code> fails with a recognized network failure. Previously callers got the raw <code class="nowrap">TypeError</code>. The original error is on <code class="nowrap">error.cause</code>. The PR exports <code class="nowrap">NetworkError</code> and an <code class="nowrap">isNetworkError</code> type guard. It also changes the default retry logic: only <code class="nowrap">TimeoutError</code>, <code class="nowrap">HTTPError</code>, and <code class="nowrap">NetworkError</code> are retried. Any other error is thrown immediately unless <code class="nowrap">shouldRetry</code> returns <code class="nowrap">true</code>.</p><p>Detection uses <code class="nowrap">isRawNetworkError</code>, inlined from <code class="nowrap">is-network-error</code> v1.3.1. It matches a <code class="nowrap">TypeError</code> by runtime-specific message strings for Chrome, Firefox, Safari, Undici, Deno, Bun, and Cloudflare. A <code class="nowrap">try/catch</code> in the fetch path of <code class="nowrap">Ky.ts</code> performs the wrapping. Both the error type change and the narrowed retry policy break existing caller expectations. The PR also corrects stale JSDoc in <code class="nowrap">options.ts</code> and <code class="nowrap">retry.ts</code> about <code class="nowrap">maxRetryAfter</code> and timeout retries.</p></div>
     <ul class="glance" aria-label="At a glance">
       <li>
         <a href="#changes"
@@ -1486,7 +1486,7 @@ a.location {
       </li>
       <li>
         <a href="#tests"
-          ><span class="glance-value">6 checks</span
+          ><span class="glance-value">7 checks</span
           ><span class="glance-label">to verify</span></a
         >
       </li>
@@ -1512,18 +1512,18 @@ a.location {
           ><span class="add">+35</span>
           <span class="del">−14</span></span
         >
-        <span class="change-preview"><code class="nowrap">#fetch</code> now wraps the <code class="nowrap">fetch</code> and <code class="nowrap">timeout</code> calls in <code class="nowrap">try</code>/<code class="nowrap">catch</code> and rethrows recognized network failures as <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> returns early for timeouts and HTTP errors, retries a <code class="nowrap">NetworkError</code>, and throws every other error.</span>
+        <span class="change-preview">The fetch call, with or without <code class="nowrap">timeout</code>, now sits in a <code class="nowrap">try/catch</code>. The catch rethrows <code>NetworkError(this.request, {cause})</code> when <code class="nowrap">isRawNetworkError</code> matches. The retry-delay logic now returns <code class="nowrap">#calculateDelay()</code> explicitly for timeouts and HTTP errors. It throws any error that is not <code class="nowrap">isNetworkError</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd><code class="nowrap">#fetch</code> now wraps the <code class="nowrap">fetch</code> and <code class="nowrap">timeout</code> calls in <code class="nowrap">try</code>/<code class="nowrap">catch</code> and rethrows recognized network failures as <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> returns early for timeouts and HTTP errors, retries a <code class="nowrap">NetworkError</code>, and throws every other error.</dd>
+                  <dd>The fetch call, with or without <code class="nowrap">timeout</code>, now sits in a <code class="nowrap">try/catch</code>. The catch rethrows <code>NetworkError(this.request, {cause})</code> when <code class="nowrap">isRawNetworkError</code> matches. The retry-delay logic now returns <code class="nowrap">#calculateDelay()</code> explicitly for timeouts and HTTP errors. It throws any error that is not <code class="nowrap">isNetworkError</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Before, any error that was not a timeout or a filtered <code class="nowrap">HTTPError</code> was retried, including bugs in hooks or custom <code class="nowrap">fetch</code> code. Now the retry decision depends on the error type.</dd>
+                        <dd>Callers and hooks now see <code class="nowrap">NetworkError</code> instead of <code class="nowrap">TypeError</code>. Errors that were retried before, such as arbitrary thrown errors from a custom <code class="nowrap">fetch</code>, are no longer retried by default.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04" rel="noopener noreferrer" target="_blank"
@@ -1543,18 +1543,18 @@ a.location {
           ><span class="add">+49</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds <code class="nowrap">isRawNetworkError</code>, inlined from <code class="nowrap">is-network-error</code> 1.3.1. It matches a <code class="nowrap">TypeError</code> by the exact message that each runtime uses for network failures, such as <code class="nowrap">Failed to fetch</code> and <code class="nowrap">fetch failed</code>.</span>
+        <span class="change-preview">New <code class="nowrap">isRawNetworkError</code>. It checks for a <code class="nowrap">TypeError</code> whose message matches a known set of network-failure messages. It also handles special cases for Safari <code class="nowrap">Load failed</code>, Deno, and Chrome <code class="nowrap">Failed to fetch (host)</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code class="nowrap">isRawNetworkError</code>, inlined from <code class="nowrap">is-network-error</code> 1.3.1. It matches a <code class="nowrap">TypeError</code> by the exact message that each runtime uses for network failures, such as <code class="nowrap">Failed to fetch</code> and <code class="nowrap">fetch failed</code>.</dd>
+                  <dd>New <code class="nowrap">isRawNetworkError</code>. It checks for a <code class="nowrap">TypeError</code> whose message matches a known set of network-failure messages. It also handles special cases for Safari <code class="nowrap">Load failed</code>, Deno, and Chrome <code class="nowrap">Failed to fetch (host)</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd><code class="nowrap">#fetch</code> uses it to decide which errors become <code class="nowrap">NetworkError</code>. An error with any other message stays unwrapped and is no longer retried.</dd>
+                        <dd>This heuristic decides both wrapping and retry eligibility. An unmatched message means no wrapping and no retry.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-598f918f5d95b947406e73cbd2f3d347b36a94109800ef3069d6e768a4f56429" rel="noopener noreferrer" target="_blank"
@@ -1574,18 +1574,18 @@ a.location {
           ><span class="add">+17</span>
           <span class="del">−0</span></span
         >
-        <span class="change-preview">Adds <code class="nowrap">NetworkError</code>, a <code class="nowrap">KyError</code> subclass with a <code class="nowrap">request</code> property and the original error in <code class="nowrap">cause</code>.</span>
+        <span class="change-preview">New <code class="nowrap">NetworkError extends KyError</code>. It has <code class="nowrap">name = &#39;NetworkError&#39;</code>, a <code class="nowrap">request</code> property, and the message <code>Request failed due to a network error: METHOD URL</code>. It forwards <code class="nowrap">cause</code> to <code class="nowrap">super</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code class="nowrap">NetworkError</code>, a <code class="nowrap">KyError</code> subclass with a <code class="nowrap">request</code> property and the original error in <code class="nowrap">cause</code>.</dd>
+                  <dd>New <code class="nowrap">NetworkError extends KyError</code>. It has <code class="nowrap">name = &#39;NetworkError&#39;</code>, a <code class="nowrap">request</code> property, and the message <code>Request failed due to a network error: METHOD URL</code>. It forwards <code class="nowrap">cause</code> to <code class="nowrap">super</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Callers can now tell network failures apart from <code class="nowrap">HTTPError</code> and <code class="nowrap">TimeoutError</code> without matching messages.</dd>
+                        <dd>This is the new public error type for network failures.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-dd8ea2afc3509b01cd04de98b9b464d66570a56b4801140afef877e293f018f2" rel="noopener noreferrer" target="_blank"
@@ -1605,18 +1605,18 @@ a.location {
           ><span class="add">+24</span>
           <span class="del">−1</span></span
         >
-        <span class="change-preview">Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or an error <code class="nowrap">name</code> of <code class="nowrap">NetworkError</code>. <code class="nowrap">isKyError</code> now also returns <code class="nowrap">true</code> for a <code class="nowrap">NetworkError</code>.</span>
+        <span class="change-preview">Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or <code class="nowrap">name === &#39;NetworkError&#39;</code>. <code class="nowrap">isKyError</code> now also accepts <code class="nowrap">isNetworkError</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or an error <code class="nowrap">name</code> of <code class="nowrap">NetworkError</code>. <code class="nowrap">isKyError</code> now also returns <code class="nowrap">true</code> for a <code class="nowrap">NetworkError</code>.</dd>
+                  <dd>Adds <code class="nowrap">isNetworkError</code>, which checks <code class="nowrap">instanceof NetworkError</code> or <code class="nowrap">name === &#39;NetworkError&#39;</code>. <code class="nowrap">isKyError</code> now also accepts <code class="nowrap">isNetworkError</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The name check lets the guard work across separate copies of Ky, like the other guards.</dd>
+                        <dd><code class="nowrap">Ky.ts</code> uses <code class="nowrap">isNetworkError</code> to decide retries. Users get a cross-realm guard.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-74f46ee505bc3de73cb416f36b6476393db46ab09673c90d4a376b47c35a49fe" rel="noopener noreferrer" target="_blank"
@@ -1647,7 +1647,7 @@ a.location {
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Makes the new class and guard part of the public API.</dd>
+                        <dd>This adds to the public API surface.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-fcd423a0b6ae0654240ee2c1cb0b023707df57b7d1c7a3834c5bfbef7d901da5" rel="noopener noreferrer" target="_blank"
@@ -1667,18 +1667,18 @@ a.location {
           ><span class="add">+4</span>
           <span class="del">−6</span></span
         >
-        <span class="change-preview">Rewrites the <code class="nowrap">retry</code> docs: network errors are retried for retriable methods, other errors are thrown, and a long <code class="nowrap">Retry-After</code> is capped at <code class="nowrap">maxRetryAfter</code>.</span>
+        <span class="change-preview">Rewrites the <code class="nowrap">retry</code> JSDoc. It lists all retry fields and documents network-error retries. It also fixes the <code class="nowrap">maxRetryAfter</code> behavior description. It drops the delay formula and the outdated sentence &#39;Retries are not triggered following a timeout&#39;.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Rewrites the <code class="nowrap">retry</code> docs: network errors are retried for retriable methods, other errors are thrown, and a long <code class="nowrap">Retry-After</code> is capped at <code class="nowrap">maxRetryAfter</code>.</dd>
+                  <dd>Rewrites the <code class="nowrap">retry</code> JSDoc. It lists all retry fields and documents network-error retries. It also fixes the <code class="nowrap">maxRetryAfter</code> behavior description. It drops the delay formula and the outdated sentence &#39;Retries are not triggered following a timeout&#39;.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Removes the outdated sentence that timeouts never trigger retries.</dd>
+                        <dd>Documentation only.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-31bd6859e08133a5ae483b0a09a0c550e1fa64301beafaa08298619f17d2befd" rel="noopener noreferrer" target="_blank"
@@ -1698,18 +1698,18 @@ a.location {
           ><span class="add">+2</span>
           <span class="del">−2</span></span
         >
-        <span class="change-preview">Updates the <code class="nowrap">maxRetryAfter</code> and <code class="nowrap">shouldRetry</code> docs to match the new rules.</span>
+        <span class="change-preview">JSDoc fixes for <code class="nowrap">maxRetryAfter</code>. The <code class="nowrap">shouldRetry</code> docs now state that unrecognized errors are not retried.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Updates the <code class="nowrap">maxRetryAfter</code> and <code class="nowrap">shouldRetry</code> docs to match the new rules.</dd>
+                  <dd>JSDoc fixes for <code class="nowrap">maxRetryAfter</code>. The <code class="nowrap">shouldRetry</code> docs now state that unrecognized errors are not retried.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd><code class="nowrap">shouldRetry</code> returning <code class="nowrap">undefined</code> now means &quot;retry only known error types&quot;.</dd>
+                        <dd>Documentation only.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-9707f1a0af622541821773ee1c331da0ac46c5f170282c49d2212588d7764daf" rel="noopener noreferrer" target="_blank"
@@ -1729,21 +1729,114 @@ a.location {
           ><span class="add">+3</span>
           <span class="del">−3</span></span
         >
-        <span class="change-preview">Updates the <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> docs to name <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</span>
+        <span class="change-preview">JSDoc for <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> now mentions <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Updates the <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> docs to name <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</dd>
+                  <dd>JSDoc for <code class="nowrap">beforeRetry</code> and <code class="nowrap">beforeError</code> now mentions <code class="nowrap">NetworkError</code> and <code class="nowrap">isNetworkError</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Hooks now receive a <code class="nowrap">NetworkError</code> where they used to receive a raw <code class="nowrap">TypeError</code>.</dd>
+                        <dd>Documentation only.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-094b02c7c92599bd2ece97ca886bb004e18e43279adeaf84e4a857ce9d7c8ad8" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="readme.md"
+    ><span class="path-dir"></span><span class="path-base">readme.md</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+29</span>
+          <span class="del">−5</span></span
+        >
+        <span class="change-preview">Documents network-error retries and the <code class="nowrap">NetworkError</code> section with an example. It updates hook, <code class="nowrap">HTTPError</code>, and <code class="nowrap">KyError</code> text.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>Documents network-error retries and the <code class="nowrap">NetworkError</code> section with an example. It updates hook, <code class="nowrap">HTTPError</code>, and <code class="nowrap">KyError</code> text.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Documentation only.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-5a831ea67cf5cf8703b0de46901ab25bd191f56b320053be9332d9a3b0d01d15" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/errors/HTTPError.ts"
+    ><span class="path-dir">source/errors/</span><span class="path-base">HTTPError.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+1</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">JSDoc mentions the <code class="nowrap">options</code> property.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>JSDoc mentions the <code class="nowrap">options</code> property.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Documentation only.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1006f3316aa6ec80178617fdeb867c7452b7818202fa47da5470544190f64c04" rel="noopener noreferrer" target="_blank"
+                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
+              >
+      </div>
+    </details>
+  </li><li>
+    <details class="change" >
+      <summary>
+        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="kind kind-modified">Modified</span>
+        <span class="path mono" title="source/errors/KyError.ts"
+    ><span class="path-dir">source/errors/</span><span class="path-base">KyError.ts</span></span
+  >
+        <span class="mono diffstat"
+          ><span class="add">+1</span>
+          <span class="del">−1</span></span
+        >
+        <span class="change-preview">JSDoc lists <code class="nowrap">NetworkError</code> as a subclass.</span>
+      </summary>
+      <div class="change-body">
+        
+        <dl>
+                <div>
+                  <dt>What</dt>
+                  <dd>JSDoc lists <code class="nowrap">NetworkError</code> as a subclass.</dd>
+                </div>
+                <div>
+                        <dt>Why</dt>
+                        <dd>Documentation only.</dd>
+                      </div>
+              </dl>
+        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-488177b656c122139e0c3b3c176c3b9904e6831c0b5f48350ff40302b60242be" rel="noopener noreferrer" target="_blank"
                 >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
               >
       </div>
@@ -1760,18 +1853,18 @@ a.location {
           ><span class="add">+216</span>
           <span class="del">−1</span></span
         >
-        <span class="change-preview">Adds tests: <code class="nowrap">NetworkError</code> wraps fetch failures, is retried by default, is not retried for <code class="nowrap">POST</code>, and reaches <code class="nowrap">shouldRetry</code> and <code class="nowrap">beforeError</code> with its <code class="nowrap">cause</code>. Also tests that a non-network <code class="nowrap">TypeError</code> is neither wrapped nor retried.</span>
+        <span class="change-preview">Adds tests for wrapping, default retry, POST non-retry, and non-network <code class="nowrap">TypeError</code> passthrough. It also covers <code class="nowrap">shouldRetry</code> forcing and fallthrough, <code class="nowrap">beforeError</code> cause chain, and <code class="nowrap">timeout: false</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Adds tests: <code class="nowrap">NetworkError</code> wraps fetch failures, is retried by default, is not retried for <code class="nowrap">POST</code>, and reaches <code class="nowrap">shouldRetry</code> and <code class="nowrap">beforeError</code> with its <code class="nowrap">cause</code>. Also tests that a non-network <code class="nowrap">TypeError</code> is neither wrapped nor retried.</dd>
+                  <dd>Adds tests for wrapping, default retry, POST non-retry, and non-network <code class="nowrap">TypeError</code> passthrough. It also covers <code class="nowrap">shouldRetry</code> forcing and fallthrough, <code class="nowrap">beforeError</code> cause chain, and <code class="nowrap">timeout: false</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Covers both new rules: the wrapping in <code class="nowrap">#fetch</code> and the retry decision in <code class="nowrap">#calculateRetryDelay</code>.</dd>
+                        <dd>These tests cover the new behavior.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-057f1cac975e0d13462dc0b8af0a28b3435beb1d59652a11b20a180026546b70" rel="noopener noreferrer" target="_blank"
@@ -1791,18 +1884,18 @@ a.location {
           ><span class="add">+10</span>
           <span class="del">−9</span></span
         >
-        <span class="change-preview">Replaces fake failures such as <code>new Error(&#39;simulated network failure&#39;)</code> with <code>new TypeError(&#39;Failed to fetch&#39;)</code>, and asserts <code class="nowrap">isNetworkError(error)</code>.</span>
+        <span class="change-preview">Simulated network failures now throw <code class="nowrap">TypeError(&#39;Failed to fetch&#39;)</code> instead of arbitrary messages. Assertions use <code class="nowrap">isNetworkError</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Replaces fake failures such as <code>new Error(&#39;simulated network failure&#39;)</code> with <code>new TypeError(&#39;Failed to fetch&#39;)</code>, and asserts <code class="nowrap">isNetworkError(error)</code>.</dd>
+                  <dd>Simulated network failures now throw <code class="nowrap">TypeError(&#39;Failed to fetch&#39;)</code> instead of arbitrary messages. Assertions use <code class="nowrap">isNetworkError</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The old fake errors are no longer retried. This shows that custom <code class="nowrap">fetch</code> errors with other messages lose their retries.</dd>
+                        <dd>The old arbitrary messages are no longer recognized or retried. These test edits show the behavior change for custom <code class="nowrap">fetch</code> implementations.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-86368c447a569cc00ca9d074ef7fe779154a6f1187706619d228ef2a4241759a" rel="noopener noreferrer" target="_blank"
@@ -1822,18 +1915,18 @@ a.location {
           ><span class="add">+2</span>
           <span class="del">−1</span></span
         >
-        <span class="change-preview">Reads the Undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</span>
+        <span class="change-preview">Reads the undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Reads the Undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</dd>
+                  <dd>Reads the undici error code from <code class="nowrap">error.cause.cause</code> instead of <code class="nowrap">error.cause</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>The Undici <code class="nowrap">TypeError</code> now sits one level deeper, inside <code class="nowrap">NetworkError</code>. Caller code that reads <code class="nowrap">error.cause.code</code> must change the same way.</dd>
+                        <dd>The extra <code class="nowrap">NetworkError</code> layer moves the cause one level deeper.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-e0bd4137c32f919d49496f6183e9ef3740238f2f3214d1561bc35ba6ce2e809b" rel="noopener noreferrer" target="_blank"
@@ -1853,114 +1946,21 @@ a.location {
           ><span class="add">+2</span>
           <span class="del">−3</span></span
         >
-        <span class="change-preview">Expects <code class="nowrap">NetworkError</code> instead of a <code class="nowrap">TypeError</code> with the message <code class="nowrap">fetch failed</code>.</span>
+        <span class="change-preview">Expects <code class="nowrap">NetworkError</code> instead of <code class="nowrap">TypeError</code> with <code class="nowrap">fetch failed</code>.</span>
       </summary>
       <div class="change-body">
         
         <dl>
                 <div>
                   <dt>What</dt>
-                  <dd>Expects <code class="nowrap">NetworkError</code> instead of a <code class="nowrap">TypeError</code> with the message <code class="nowrap">fetch failed</code>.</dd>
+                  <dd>Expects <code class="nowrap">NetworkError</code> instead of <code class="nowrap">TypeError</code> with <code class="nowrap">fetch failed</code>.</dd>
                 </div>
                 <div>
                         <dt>Why</dt>
-                        <dd>Follows the new error type.</dd>
+                        <dd>This reflects the new error type.</dd>
                       </div>
               </dl>
         <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-aba702dbd8d908680657855a9e2ab8aa0b0fc0c0c32c8b7b8f616caafc52d8b4" rel="noopener noreferrer" target="_blank"
-                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
-              >
-      </div>
-    </details>
-  </li><li>
-    <details class="change" >
-      <summary>
-        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="kind kind-modified">Modified</span>
-        <span class="path mono" title="readme.md"
-    ><span class="path-dir"></span><span class="path-base">readme.md</span></span
-  >
-        <span class="mono diffstat"
-          ><span class="add">+29</span>
-          <span class="del">−5</span></span
-        >
-        <span class="change-preview">Documents <code class="nowrap">NetworkError</code>, <code class="nowrap">isNetworkError</code>, and the new retry rules.</span>
-      </summary>
-      <div class="change-body">
-        
-        <dl>
-                <div>
-                  <dt>What</dt>
-                  <dd>Documents <code class="nowrap">NetworkError</code>, <code class="nowrap">isNetworkError</code>, and the new retry rules.</dd>
-                </div>
-                <div>
-                        <dt>Why</dt>
-                        <dd>Keeps the readme in sync with the type docs.</dd>
-                      </div>
-              </dl>
-        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-5a831ea67cf5cf8703b0de46901ab25bd191f56b320053be9332d9a3b0d01d15" rel="noopener noreferrer" target="_blank"
-                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
-              >
-      </div>
-    </details>
-  </li><li>
-    <details class="change" >
-      <summary>
-        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="kind kind-modified">Modified</span>
-        <span class="path mono" title="source/errors/KyError.ts"
-    ><span class="path-dir">source/errors/</span><span class="path-base">KyError.ts</span></span
-  >
-        <span class="mono diffstat"
-          ><span class="add">+1</span>
-          <span class="del">−1</span></span
-        >
-        <span class="change-preview">Lists <code class="nowrap">NetworkError</code> among the subclasses in the class doc.</span>
-      </summary>
-      <div class="change-body">
-        
-        <dl>
-                <div>
-                  <dt>What</dt>
-                  <dd>Lists <code class="nowrap">NetworkError</code> among the subclasses in the class doc.</dd>
-                </div>
-                <div>
-                        <dt>Why</dt>
-                        <dd>Doc-only change.</dd>
-                      </div>
-              </dl>
-        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-488177b656c122139e0c3b3c176c3b9904e6831c0b5f48350ff40302b60242be" rel="noopener noreferrer" target="_blank"
-                >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
-              >
-      </div>
-    </details>
-  </li><li>
-    <details class="change" >
-      <summary>
-        <svg class="icon icon-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="kind kind-modified">Modified</span>
-        <span class="path mono" title="source/errors/HTTPError.ts"
-    ><span class="path-dir">source/errors/</span><span class="path-base">HTTPError.ts</span></span
-  >
-        <span class="mono diffstat"
-          ><span class="add">+1</span>
-          <span class="del">−1</span></span
-        >
-        <span class="change-preview">Mentions the <code class="nowrap">options</code> property in the class doc.</span>
-      </summary>
-      <div class="change-body">
-        
-        <dl>
-                <div>
-                  <dt>What</dt>
-                  <dd>Mentions the <code class="nowrap">options</code> property in the class doc.</dd>
-                </div>
-                <div>
-                        <dt>Why</dt>
-                        <dd>Doc-only change.</dd>
-                      </div>
-              </dl>
-        <a class="file-link" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1006f3316aa6ec80178617fdeb867c7452b7818202fa47da5470544190f64c04" rel="noopener noreferrer" target="_blank"
                 >View in pull request <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
               >
       </div>
@@ -1975,7 +1975,7 @@ a.location {
                       data-flow-diagram
                       data-state="loading"
                       role="img"
-                      aria-label="A request goes through `#fetch`, which calls the configured `fetch`. A failure that `isRawNetworkError` recognizes becomes a `NetworkError`. `#calculateRetryDelay` uses `isNetworkError` to decide whether to retry."
+                      aria-label="A fetch rejection passes through `isRawNetworkError`. Ky wraps recognized failures in `NetworkError`. The retry logic then retries only timeout, HTTP, or network errors."
                     >
                       <p class="flow-status muted" data-flow-status>Rendering diagram…</p>
                     </div>
@@ -1987,7 +1987,7 @@ a.location {
                         ><span class="swatch swatch-context"></span>Unchanged context</span
                       >
                     </div>
-            <figcaption>A request goes through <code class="nowrap">#fetch</code>, which calls the configured <code class="nowrap">fetch</code>. A failure that <code class="nowrap">isRawNetworkError</code> recognizes becomes a <code class="nowrap">NetworkError</code>. <code class="nowrap">#calculateRetryDelay</code> uses <code class="nowrap">isNetworkError</code> to decide whether to retry.</figcaption>
+            <figcaption>A fetch rejection passes through <code class="nowrap">isRawNetworkError</code>. Ky wraps recognized failures in <code class="nowrap">NetworkError</code>. The retry logic then retries only timeout, HTTP, or network errors.</figcaption>
             <details class="flow-text" data-flow-text >
     <summary>Components and connections</summary>
     <div class="flow-text-body">
@@ -1996,28 +1996,20 @@ a.location {
         <ul>
           <li>
                 <span class="flow-node-name "
-                  >ky.get() and friends</span
-                >
-                <span class="muted"
-                  >entry point</span
-                >
-                
-              </li><li>
-                <span class="flow-node-name is-changed"
-                  >#fetch</span
-                >
-                <span class="muted"
-                  >function, changed</span
-                >
-                <code>source/core/Ky.ts</code>
-              </li><li>
-                <span class="flow-node-name "
-                  >configured fetch</span
+                  >#options.fetch / timeout()</span
                 >
                 <span class="muted"
                   >external service</span
                 >
                 
+              </li><li>
+                <span class="flow-node-name is-changed"
+                  >Ky fetch try/catch</span
+                >
+                <span class="muted"
+                  >function, changed</span
+                >
+                <code>source/core/Ky.ts</code>
               </li><li>
                 <span class="flow-node-name is-changed"
                   >isRawNetworkError</span
@@ -2036,7 +2028,7 @@ a.location {
                 <code>source/errors/NetworkError.ts</code>
               </li><li>
                 <span class="flow-node-name is-changed"
-                  >#calculateRetryDelay</span
+                  >Ky retry delay calculation</span
                 >
                 <span class="muted"
                   >function, changed</span
@@ -2050,6 +2042,14 @@ a.location {
                   >function, changed</span
                 >
                 <code>source/utils/type-guards.ts</code>
+              </li><li>
+                <span class="flow-node-name "
+                  >Caller / beforeError hooks</span
+                >
+                <span class="muted"
+                  >entry point</span
+                >
+                
               </li>
         </ul>
       </div>
@@ -2057,26 +2057,23 @@ a.location {
         <h3>Connections</h3>
         <ul>
                 <li>
-                      ky.get() and friends → #fetch
-                      <span class="muted">(Request)</span>
+                      #options.fetch / timeout() → Ky fetch try/catch
+                      <span class="muted">(rejected error)</span>
                     </li><li>
-                      #fetch → configured fetch
-                      <span class="muted">(request and options)</span>
+                      Ky fetch try/catch → isRawNetworkError
+                      <span class="muted">(check error)</span>
                     </li><li>
-                      #fetch → isRawNetworkError
-                      <span class="muted">(caught error)</span>
+                      Ky fetch try/catch → NetworkError
+                      <span class="muted">(wrap with cause)</span>
                     </li><li>
-                      #fetch → NetworkError
-                      <span class="muted">(wraps as cause)</span>
+                      NetworkError → Ky retry delay calculation
+                      <span class="muted">(thrown error)</span>
                     </li><li>
-                      NetworkError → #calculateRetryDelay
-                      <span class="muted">(rejected attempt)</span>
+                      Ky retry delay calculation → isNetworkError
+                      <span class="muted">(is retriable?)</span>
                     </li><li>
-                      #calculateRetryDelay → isNetworkError
-                      <span class="muted">(error type check)</span>
-                    </li><li>
-                      #calculateRetryDelay → #fetch
-                      <span class="muted">(retry after delay)</span>
+                      Ky retry delay calculation → Caller / beforeError hooks
+                      <span class="muted">(throw non-retriable)</span>
                     </li>
               </ul>
       </div>
@@ -2090,33 +2087,33 @@ a.location {
       <p class="section-note">1 high · 1 medium · 1 low</p>
     </div>
     <ol class="risk-list">
-            <li class="risk severity-high" id="risk-r_79895783f1">
+            <li class="risk severity-high" id="risk-r_35d7534e60">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>High</span>
-      <h3 class="risk-title">Network failures are no longer <code class="nowrap">TypeError</code> instances</h3>
+      <h3 class="risk-title">Network failures no longer surface as <code class="nowrap">TypeError</code></h3>
     </div>
     <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04R832-R835" rel="noopener noreferrer" target="_blank"
         >source/core/Ky.ts:832–835 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason"><code class="nowrap">#fetch</code> now rethrows recognized failures as <code class="nowrap">NetworkError</code>, which extends <code class="nowrap">KyError</code>, not <code class="nowrap">TypeError</code>. Caller code that checks <code class="nowrap">error instanceof TypeError</code>, <code>error.message === &#39;Failed to fetch&#39;</code>, or <code class="nowrap">error.cause.code</code> stops matching. The PR had to change such checks in <code class="nowrap">test/hooks.ts</code>, <code class="nowrap">test/headers.ts</code>, and <code class="nowrap">test/memory-leak.ts</code>. Release this as a breaking change.</p>
-  </li><li class="risk severity-medium" id="risk-r_1fc518eeba">
+    <p class="risk-reason">Before this PR, a fetch network failure reached callers as the raw <code class="nowrap">TypeError</code>, for example with message <code class="nowrap">Failed to fetch</code>. Now callers receive a <code class="nowrap">NetworkError</code>, which is not a <code class="nowrap">TypeError</code>. Code that checks <code class="nowrap">error instanceof TypeError</code>, <code class="nowrap">error.message</code>, or <code class="nowrap">error.cause.code</code> breaks silently. The PR&#39;s own <code class="nowrap">test/headers.ts</code> edit shows this: the undici code moves from <code class="nowrap">error.cause</code> to <code class="nowrap">error.cause.cause</code>. This is a breaking change for callers.</p>
+  </li><li class="risk severity-medium" id="risk-r_092d4b9cdc">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Medium</span>
-      <h3 class="risk-title">Errors from custom <code class="nowrap">fetch</code> implementations are no longer retried</h3>
+      <h3 class="risk-title">Unrecognized errors are no longer retried by default</h3>
     </div>
     <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-1d28e040cea335f5a22aa9c3f678f5d00b353e3ce966dc0978a91fe56f240b04R490-R493" rel="noopener noreferrer" target="_blank"
         >source/core/Ky.ts:490–493 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">Line 491 throws every error that is not a <code class="nowrap">NetworkError</code>. <code class="nowrap">#fetch</code> creates a <code class="nowrap">NetworkError</code> only for a <code class="nowrap">TypeError</code> with a known message (line 833). A custom <code class="nowrap">fetch</code> such as <code class="nowrap">node-fetch</code> rejects with its own <code class="nowrap">FetchError</code> on <code class="nowrap">ECONNREFUSED</code>, so a <code class="nowrap">GET</code> that Ky used to retry now fails on the first attempt.</p>
-  </li><li class="risk severity-low" id="risk-r_19a70b115a">
+    <p class="risk-reason">The old code fell through to <code class="nowrap">#calculateDelay()</code> for any error. The new code throws anything that is not <code class="nowrap">isNetworkError</code>. Some failures never become a <code class="nowrap">NetworkError</code>. Examples are a network error from a runtime or fetch polyfill whose message is not in <code class="nowrap">isRawNetworkError</code>&#39;s list, or a custom <code class="nowrap">fetch</code> that throws its own error type. Those failures now fail on the first attempt instead of retrying. The <code class="nowrap">test/hooks.ts</code> changes from <code class="nowrap">&#39;network down&#39;</code> to <code class="nowrap">&#39;Failed to fetch&#39;</code> show this regression.</p>
+  </li><li class="risk severity-low" id="risk-r_30a1f84032">
     <div class="risk-head">
       <span class="severity-badge"><svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Low</span>
-      <h3 class="risk-title"><code class="nowrap">isNetworkError</code> also matches the standard <code class="nowrap">DOMException</code> named <code class="nowrap">NetworkError</code></h3>
+      <h3 class="risk-title">Name-based guard matches foreign <code class="nowrap">NetworkError</code> errors</h3>
     </div>
     <a class="location mono" href="https://github.com/sindresorhus/ky/pull/842/files#diff-74f46ee505bc3de73cb416f36b6476393db46ab09673c90d4a376b47c35a49feR75-R77" rel="noopener noreferrer" target="_blank"
         >source/utils/type-guards.ts:75–77 <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a
       >
-    <p class="risk-reason">Line 76 accepts any error whose <code class="nowrap">name</code> is <code class="nowrap">NetworkError</code>. Browsers use that name for a standard <code class="nowrap">DOMException</code>, which has no <code class="nowrap">request</code> property. Code that follows the documented example and reads <code class="nowrap">error.request.url</code> after the guard throws a <code class="nowrap">TypeError</code> for such an error.</p>
+    <p class="risk-reason"><code class="nowrap">isNetworkError</code> returns true for any object with <code class="nowrap">name === &#39;NetworkError&#39;</code>. Examples are a DOM <code class="nowrap">DOMException</code> named <code class="nowrap">NetworkError</code> or another library&#39;s error class. The retry logic would then retry such errors. <code class="nowrap">isKyError</code> would also misclassify them as Ky errors, even though they lack <code class="nowrap">request</code>.</p>
   </li>
           </ol>
   </section> <section class="section" id="tests" aria-labelledby="tests-title">
@@ -2124,7 +2121,7 @@ a.location {
       <h2 id="tests-title">Test checklist</h2>
       <div class="section-tools">
               <span class="section-note" data-check-progress aria-live="polite"
-                >0 of 6 done</span
+                >0 of 7 done</span
               >
               <button type="button" class="text-button" data-check-reset>Reset</button>
             </div>
@@ -2135,57 +2132,66 @@ a.location {
             <ul class="checklist">
               <li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_c870fee014" />
+                      <input type="checkbox" data-check-id="t_760ebf6ddf" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">In Node, request a closed local port with <code class="nowrap">ky.get(url, {retry: 2})</code>. Confirm it rejects with <code class="nowrap">NetworkError</code> after 3 attempts and that <code class="nowrap">error.cause</code> is Undici&#39;s <code class="nowrap">TypeError(&#39;fetch failed&#39;)</code>.</span>
+                      <span class="check-text">Use a custom <code class="nowrap">fetch</code> that throws <code class="nowrap">new Error(&#39;socket hang up&#39;)</code> with <code class="nowrap">retry: {limit: 2}</code>. Confirm it now runs once, where it ran three times before this PR. Decide whether that change is intended.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_6fb2468685" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Point Ky at an unreachable port on Node (Undici). Confirm the thrown error is <code class="nowrap">NetworkError</code>. Confirm <code>error.cause.message === &#39;fetch failed&#39;</code> and that GET is retried up to <code class="nowrap">limit</code>.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/core/Ky.ts">Ky.ts</code></li><li><code title="source/utils/is-network-error.ts">is-network-error.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_f596b20a8e" />
+                      <input type="checkbox" data-check-id="t_5eaa406d3c" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Pass <code class="nowrap">fetch: nodeFetch</code> and request a closed port. Confirm whether Ky still retries, and document the result for custom <code class="nowrap">fetch</code> users.</span>
+                      <span class="check-text">Make a request with an <code class="nowrap">AbortController</code> and abort it. Confirm the <code class="nowrap">AbortError</code> passes through unwrapped and is not retried.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/core/Ky.ts">Ky.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_fba5739866" />
+                      <input type="checkbox" data-check-id="t_96cc95b219" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Search the readme and changelog for an upgrade note that tells users to replace <code class="nowrap">instanceof TypeError</code> and <code class="nowrap">error.cause.code</code> checks.</span>
+                      <span class="check-text">Trigger a timeout with <code class="nowrap">retryOnTimeout: true</code>. Confirm Ky still throws <code class="nowrap">TimeoutError</code> and does not wrap it, even though the timeout is now inside the new <code class="nowrap">try/catch</code>.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
-                            <li><code title="readme.md">readme.md</code></li><li><code title="source/errors/NetworkError.ts">NetworkError.ts</code></li>
+                            <li><code title="source/core/Ky.ts">Ky.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_ca9d41ec96" />
+                      <input type="checkbox" data-check-id="t_91ae7496cd" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Call <code>isNetworkError(new DOMException(&#39;x&#39;, &#39;NetworkError&#39;))</code> and decide whether <code class="nowrap">true</code> is the intended result.</span>
+                      <span class="check-text">Throw <code class="nowrap">TypeError(&#39;Load failed&#39;)</code> with a stack from a custom <code class="nowrap">fetch</code>. Confirm Ky does not wrap or retry it. Repeat with the stack deleted and confirm Ky wraps it in <code class="nowrap">NetworkError</code>.</span>
+                    </label>
+                    <ul class="related" aria-label="Related files">
+                            <li><code title="source/utils/is-network-error.ts">is-network-error.ts</code></li>
+                          </ul>
+                  </li><li>
+                    <label class="check">
+                      <input type="checkbox" data-check-id="t_67b1781754" />
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-text">Call <code>isNetworkError(new DOMException(&#39;x&#39;, &#39;NetworkError&#39;))</code> and <code class="nowrap">isKyError</code> on the same value. Confirm the results are acceptable.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
                             <li><code title="source/utils/type-guards.ts">type-guards.ts</code></li>
                           </ul>
                   </li><li>
                     <label class="check">
-                      <input type="checkbox" data-check-id="t_ac3c796b84" />
+                      <input type="checkbox" data-check-id="t_6029c109e2" />
                       <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Set <code>retry: {retryOnTimeout: true, limit: 2}</code> against a slow endpoint and confirm timeouts are still retried.</span>
+                      <span class="check-text">Check the changelog or release notes for a breaking-change entry about <code class="nowrap">TypeError</code> becoming <code class="nowrap">NetworkError</code> and about unknown errors no longer being retried.</span>
                     </label>
                     <ul class="related" aria-label="Related files">
-                            <li><code title="source/core/Ky.ts">Ky.ts</code></li>
-                          </ul>
-                  </li><li>
-                    <label class="check">
-                      <input type="checkbox" data-check-id="t_58806fa10b" />
-                      <span class="check-box" aria-hidden="true"></span>
-                      <span class="check-text">Make a custom <code class="nowrap">fetch</code> throw <code class="nowrap">new Error(&#39;bug&#39;)</code> for a <code class="nowrap">GET</code>, and confirm Ky throws it once, without a retry.</span>
-                    </label>
-                    <ul class="related" aria-label="Related files">
-                            <li><code title="source/core/Ky.ts">Ky.ts</code></li><li><code title="test/retry.ts">retry.ts</code></li>
+                            <li><code title="readme.md">readme.md</code></li><li><code title="source/index.ts">index.ts</code></li>
                           </ul>
                   </li>
             </ul>
@@ -2200,16 +2206,16 @@ a.location {
             <dd><code>claude-opus-5-5</code></dd>
           </div><div>
             <dt>Provider</dt>
-            <dd>replay</dd>
+            <dd>anthropic</dd>
           </div><div>
             <dt>Generated</dt>
-            <dd><time datetime="2026-10-02T20:00:00.000Z">2026-10-02 20:00 UTC</time></dd>
+            <dd><time datetime="2026-10-02T21:08:19.669Z">2026-10-02 21:08 UTC</time></dd>
           </div><div>
             <dt>Analysis</dt>
             <dd>1 model call</dd>
           </div><div>
             <dt>Tokens</dt>
-            <dd>Not reported</dd>
+            <dd>21,839 in · 4,355 out</dd>
           </div><div>
             <dt>Files analyzed</dt>
             <dd>15 of 15</dd>
@@ -2227,7 +2233,7 @@ a.location {
     </p>
   </footer>
     </main>
-    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/sindresorhus/ky/pull/842","mermaid":"flowchart TD\n  subgraph g_1[\"source/core/Ky.ts\"]\n    n_fetch_method(\"#35;fetch\")\n    n_retry_delay(\"#35;calculateRetryDelay\")\n  end\n  n_request([\"ky.get#40;#41; and friends\"])\n  n_fetch_impl{{\"configured fetch\"}}\n  n_raw_check(\"isRawNetworkError\")\n  n_network_error[\"NetworkError\"]\n  n_guard(\"isNetworkError\")\n  n_request -->|\"Request\"| n_fetch_method\n  n_fetch_method -->|\"request and options\"| n_fetch_impl\n  n_fetch_method -->|\"caught error\"| n_raw_check\n  n_fetch_method -->|\"wraps as cause\"| n_network_error\n  n_network_error -->|\"rejected attempt\"| n_retry_delay\n  n_retry_delay -->|\"error type check\"| n_guard\n  n_retry_delay -->|\"retry after delay\"| n_fetch_method\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_fetch_method,n_raw_check,n_network_error,n_retry_delay,n_guard changed\n  class n_request,n_fetch_impl context"}</script>
+    <script type="application/json" id="lucidiff-data">{"storageKey":"https://github.com/sindresorhus/ky/pull/842","mermaid":"flowchart TD\n  subgraph g_1[\"source/core/Ky.ts\"]\n    n_ky_fetch(\"Ky fetch try/catch\")\n    n_retry_logic(\"Ky retry delay calculation\")\n  end\n  n_fetch_call{{\"#35;options.fetch / timeout#40;#41;\"}}\n  n_raw_check(\"isRawNetworkError\")\n  n_network_error[\"NetworkError\"]\n  n_guard(\"isNetworkError\")\n  n_caller([\"Caller / beforeError hooks\"])\n  n_fetch_call -->|\"rejected error\"| n_ky_fetch\n  n_ky_fetch -->|\"check error\"| n_raw_check\n  n_ky_fetch -->|\"wrap with cause\"| n_network_error\n  n_network_error -->|\"thrown error\"| n_retry_logic\n  n_retry_logic -->|\"is retriable?\"| n_guard\n  n_retry_logic -->|\"throw non-retriable\"| n_caller\n  classDef changed stroke-width:2px\n  classDef context stroke-dasharray:4 3\n  class n_ky_fetch,n_raw_check,n_network_error,n_retry_logic,n_guard changed\n  class n_fetch_call,n_caller context"}</script>
     <script>// Page behavior for the generated explainer. Plain browser JavaScript, no dependencies.
 //
 // 1. Theme toggle (light/dark), saved in localStorage.

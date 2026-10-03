@@ -1,37 +1,36 @@
 {
   "title": "Let `.extend()` replace or remove inherited abort signals",
-  "summary": "This PR fixes how `.extend()` handles the `signal` option. Before, `deepMergeInternal` always merged the parent signal back in, even when the child used `replaceOption(signal)` or `signal: undefined`. Now a replaced or `undefined` root-level `signal` discards the inherited signals.\n\nThe PR also limits signal collection to the root options. A `signal` key inside nested data, such as a `json` body, now merges like any other value. The readme and the `extend` type docs describe the new behavior.",
+  "summary": "After this change, `.extend()` callers can drop signals inherited from a parent instance. `signal: replaceOption(newSignal)` replaces the parent signals, and `signal: undefined` removes them. Signal merging also now applies only to the root `signal` option. A nested key such as `json.signal` no longer gets pulled into the request signal.\n\nIn `deepMergeInternal`, a root `signal` key that is a replace marker or `undefined` empties the collected `signals` array. AbortSignal collection now requires `isRoot`. The readme and the `KyInstance.extend` JSDoc document the new behavior. Tests cover replace, removal, the nested JSON case, and an extra check that instance signals still combine with request signals.",
   "changes": [
     {
       "file": "source/utils/merge.ts",
-      "what": "`deepMergeInternal` now unwraps `replaceOption` before it handles `signal`. At the root level, a replaced or `undefined` `signal` empties the `signals` list. Only root-level `AbortSignal` values go into `signals`. A comment typo is also fixed.",
-      "why": "This is the fix. Before, the parent signal stayed in `signals` and overwrote the child value at the end of the merge. `.extend({signal: replaceOption(s)})` now uses only `s`, and `.extend({signal: undefined})` removes the signal."
+      "what": "`deepMergeInternal` now unwraps `replaceOption` before signal handling. It clears `signals` when the root `signal` is a replace marker or `undefined`. It pushes AbortSignals only when `isRoot && key === 'signal'`. A typo in a comment is also fixed.",
+      "why": "Inherited signals can now be replaced or removed. Nested `signal` properties, for example inside `json`, now go through the normal merge path instead of being hoisted into the request signal."
     },
     {
       "file": "test/main.ts",
-      "what": "Adds tests for `replaceOption(signal)`, for `signal: undefined`, and for a `signal` key inside `json`. Extends the signal-merging test to abort through the instance signal.",
-      "why": "The tests cover each branch of the new root-signal logic in `deepMergeInternal`."
-    },
-    {
-      "file": "source/types/ky.ts",
-      "what": "Adds one paragraph to the `extend` JSDoc: signals are combined, and `replaceOption(signal)` or `signal: undefined` replaces or removes them.",
-      "why": "Editors show this text, so users find the new behavior where they write the call."
+      "what": "Extends the signal-merge test so an instance signal aborts a request that has its own signal. Adds three tests: replace via `replaceOption`, removal via `signal: undefined`, and nested `json.signal` handling.",
+      "why": "Covers the new clear and replace paths and the root-only scope."
     },
     {
       "file": "readme.md",
-      "what": "Adds the same paragraph to the `.extend()` section.",
-      "why": "Keeps the readme and the type docs in sync."
+      "what": "Adds a sentence on signal combining, `replaceOption(signal)`, and `signal: undefined` under `.extend()`.",
+      "why": "Documentation only."
+    },
+    {
+      "file": "source/types/ky.ts",
+      "what": "Adds the same sentence to the `KyInstance` `.extend()` JSDoc.",
+      "why": "Documentation only; no type changes."
     }
   ],
   "flow": {
-    "caption": "`.extend()` merges parent and child options in `deepMergeInternal`. At the root level, it collects each `AbortSignal` in `signals`, and a replaced or `undefined` signal empties the list. `AbortSignal.any` combines what remains.",
+    "caption": "`.extend()` and request options pass through `deepMergeInternal`. Root `signal` values are collected, cleared, or replaced, then combined into `returnValue.signal`.",
     "nodes": [
-      { "id": "extend", "label": "ky.extend()", "kind": "entry", "file": null, "changed": false },
       {
-        "id": "replace_option",
-        "label": "replaceOption()",
-        "kind": "function",
-        "file": "source/utils/merge.ts",
+        "id": "extend",
+        "label": "ky.extend / request call",
+        "kind": "entry",
+        "file": null,
         "changed": false
       },
       {
@@ -43,53 +42,78 @@
       },
       {
         "id": "signals",
-        "label": "signals list",
+        "label": "signals array",
         "kind": "data",
         "file": "source/utils/merge.ts",
         "changed": true
       },
       {
-        "id": "abort_any",
-        "label": "AbortSignal.any",
-        "kind": "external",
-        "file": null,
+        "id": "result_signal",
+        "label": "returnValue.signal (AbortSignal.any or last)",
+        "kind": "data",
+        "file": "source/utils/merge.ts",
         "changed": false
       }
     ],
     "edges": [
-      { "from": "extend", "to": "deep_merge", "label": "parent and child options" },
-      { "from": "replace_option", "to": "deep_merge", "label": "wrapped signal" },
-      { "from": "deep_merge", "to": "signals", "label": "push or empty" },
-      { "from": "signals", "to": "abort_any", "label": "two or more signals" }
+      {
+        "from": "extend",
+        "to": "deep_merge",
+        "label": "option sources"
+      },
+      {
+        "from": "deep_merge",
+        "to": "signals",
+        "label": "push / clear root signal"
+      },
+      {
+        "from": "signals",
+        "to": "result_signal",
+        "label": "combine"
+      }
     ]
   },
   "risks": [
     {
-      "severity": "low",
-      "title": "`signal: null` still inherits the parent signal",
+      "severity": "medium",
+      "title": "Per-request `signal: undefined` now drops instance signal",
       "file": "source/utils/merge.ts",
       "side": "new",
       "start_line": 227,
       "end_line": 230,
-      "reason": "Line 228 empties `signals` only for `replaceOption` or `undefined`. With `signal: null`, line 285 stores `null`, and lines 312-322 then replace it with the parent signal. `searchParams: null` and `context: null` remove their values, so callers can expect the same here."
+      "reason": "The clear applies to any root-level merge, not only `.extend()`. The existing test shows request options merge with instance signals through this path. A call like `api.get(url, {signal: opts.signal})` with an undefined `opts.signal` now empties `signals`. That silently discards the instance-level signal. The old code ignored a non-AbortSignal value here and kept the instance signal."
     }
   ],
   "tests": [
     {
-      "description": "Call `ky.create({signal: a.signal}).extend({signal: null})`, abort `a`, and check whether the request aborts. Decide if `null` should remove the signal like `undefined`.",
-      "related_files": ["source/utils/merge.ts"]
+      "description": "Create `ky.create({signal: s})`, abort `s`, then call `api.get(url, {signal: undefined})`. Confirm whether the request still aborts. The old code aborts it; the new code does not.",
+      "related_files": [
+        "source/utils/merge.ts"
+      ]
     },
     {
-      "description": "Chain `base.extend({signal: replaceOption(b.signal)}).extend({signal: c.signal})`. Abort `b`, then `c`, and confirm each one aborts the request and the base signal does not.",
-      "related_files": ["source/utils/merge.ts", "test/main.ts"]
+      "description": "Run `test/main.ts` and confirm the three new tests pass, plus the extended 'merges signals from instance and request options' test.",
+      "related_files": [
+        "test/main.ts"
+      ]
     },
     {
-      "description": "Pass `signal: replaceOption(undefined)` to `.extend()` and confirm the parent signal no longer aborts the request.",
-      "related_files": ["source/utils/merge.ts"]
+      "description": "Chain `ky.create({signal: a}).extend({signal: replaceOption(b)}).extend({signal: c})`. Abort `a` and confirm no abort. Then abort `c` and confirm an abort.",
+      "related_files": [
+        "source/utils/merge.ts"
+      ]
     },
     {
-      "description": "Send a POST with `json: {signal: 'x'}` through an extended instance and confirm the server receives `{\"signal\": \"x\"}` unchanged.",
-      "related_files": ["source/utils/merge.ts"]
+      "description": "Merge `json: {signal: someAbortSignal}` into an instance that has no prior `json`. Confirm the request body and the request signal match expectations, since nested signals now take the generic merge path.",
+      "related_files": [
+        "source/utils/merge.ts"
+      ]
+    },
+    {
+      "description": "Run the tests where `AbortSignal.any` is unavailable. Confirm that `replaceOption(signal)` still yields the replacement as `signals.at(-1)`.",
+      "related_files": [
+        "source/utils/merge.ts"
+      ]
     }
   ]
 }
