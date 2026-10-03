@@ -1,5 +1,9 @@
 name: Release
 
+# Versions and publishes the packages to npm. Off until npm is set up: add the NPM_TOKEN
+# repository secret, then set the repository variable RELEASE_ENABLED to "true"
+# (Settings → Secrets and variables → Actions).
+
 on:
   push:
     branches: [main]
@@ -16,6 +20,7 @@ concurrency:
 jobs:
   release:
     name: Version or publish packages
+    if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

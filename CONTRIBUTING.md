@@ -110,4 +110,6 @@ written next to it. When you change a prompt:
 
 Merging to `main` runs the release workflow. When changesets are pending, it opens a "Version
 packages" PR. Merging that PR publishes the new versions to npm with provenance. The workflow
-needs an `NPM_TOKEN` repository secret.
+needs an `NPM_TOKEN` repository secret, and runs only when the repository variable
+`RELEASE_ENABLED` is `true`. To let it open the PR, turn on "Allow GitHub Actions to create
+and approve pull requests" in Settings → Actions → General.
