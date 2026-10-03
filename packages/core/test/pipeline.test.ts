@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   changeSetFromDiff,
+  DEFAULT_BUDGET,
   estimateTokens,
   explain,
   filterFiles,
@@ -358,29 +359,25 @@ describe('explain on large PRs', () => {
         notes: parts.map((part) => part.notes).join(' '),
       };
     });
-    // Find the smallest batch budget that still fits every file, so the PR splits into batches.
+    // Find the smallest budget that still fits every file, so the PR splits into batches.
     const changeSet = changeSetFromDiff(fixtureDiff('multi-file.diff'));
     const { files, skipped } = filterFiles(changeSet.files);
     const prepared = redactChangeSet({ ...changeSet, files, skipped });
-    let batchInputTokens = 2000;
-    for (; batchInputTokens < 20_000; batchInputTokens += 50) {
+    let maxInputTokens = 2000;
+    for (; maxInputTokens < 20_000; maxInputTokens += 50) {
       const plan = planAnalysis(
         prepared,
         estimateTokens(prompts.EXPLAINER_SYSTEM_PROMPT),
         estimateTokens(prompts.BATCH_SYSTEM_PROMPT),
-        {
-          maxInputTokens: 1000,
-          batchInputTokens,
-          includeContents: false,
-          maxContentTokensPerFile: 0,
-        },
+        { ...DEFAULT_BUDGET, maxInputTokens, includeContents: false },
       );
       if (plan.mode === 'batched' && plan.batches.length > 0 && plan.tooLarge.length === 0) break;
     }
 
+    // Only the single-call budget is set: batches must stay within it too.
     const { document } = await explain(
       { kind: 'diff', diff: fixtureDiff('multi-file.diff') },
-      { model, now: NOW, concurrency: 1, budget: { maxInputTokens: 1000, batchInputTokens } },
+      { model, now: NOW, concurrency: 1, budget: { maxInputTokens } },
     );
     expect(document.meta.mode).toBe('batched');
     const calls = model.doStreamCalls.length;

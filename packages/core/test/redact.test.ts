@@ -73,6 +73,36 @@ describe('redactText', () => {
     expect(counter.total).toBe(0);
   });
 
+  it('leaves fake credentials from test fixtures alone', () => {
+    // From sindresorhus/ky's tests and readme, which a live run redacted 22 times.
+    const lines = [
+      "const api = ky.create({ token: 'secret123' });",
+      "const validToken = 'valid-token';",
+      "headers: { token: 'valid:token' }",
+      "headers: {'X-Auth-Token': 'original-token'}",
+      'validToken = `fresh-token-${refreshCount}`;',
+      'const token = `${prefix}${suffix}`;',
+      'const clientSecret = "fakeClientSecret";',
+      'password: "test-password-1"',
+      'DATABASE_URL=postgres://user:test-password@localhost/app',
+    ].join('\n');
+    const { out, counter } = redact(lines);
+    expect(out).toBe(lines);
+    expect(counter.total).toBe(0);
+  });
+
+  it('redacts values with random parts even when they contain placeholder words', () => {
+    const { counter } = redact(
+      [
+        'password = "mysecretpassword2024"',
+        "token: 'secret-9f8e7d6c5b4a'",
+        "apiKey: 'test-key-a8Kq2Zp7'",
+        'token: `${prefix}-9f8e7d6c5b4a3210`',
+      ].join('\n'),
+    );
+    expect(counter.byKind).toEqual({ 'secret-assignment': 4 });
+  });
+
   it('redacts a private key block across lines and keeps the line count', () => {
     const key = [
       'const pem = `',

@@ -60,6 +60,46 @@ const SECRET_PATTERNS: readonly SecretPattern[] = [
 const PLACEHOLDER =
   /^(?:x+|\*+|\.+|<[^>]*>|\$\{[^}]*\}|\{\{[^}]*\}\}|your[_-].*|changeme|example.*|placeholder|redacted|test|dummy|secret|password|null|none|undefined|true|false)$/i;
 
+/**
+ * Words that test fixtures and docs build fake credentials from, as in `secret123`,
+ * `valid-token`, or `fakeApiKey`. A value made only of these words and short numbers is not a
+ * secret. Real secrets have random parts, and weak passwords are usually one run of letters
+ * (`mysecretpassword`), so neither matches.
+ */
+const PLACEHOLDER_WORDS = new Set(
+  `
+    a abc access admin another api apikey auth bad bar baz bearer change changeme client
+    correct current custom default demo dev dummy example expired fake first foo fresh good
+    hello incorrect initial invalid key me mock my new next old original other pass passwd
+    password placeholder previous private public pwd qux random redacted refresh refreshed
+    revoked sample second secret some stale string stub super test testing the token updated
+    user valid value world wrong xyz your
+  `
+    .trim()
+    .split(/\s+/)
+    .flatMap((word) => [word, `${word}s`]),
+);
+
+/**
+ * True when a value is built only from placeholder words, numbers of up to 6 digits, and
+ * template interpolations such as `${count}` (a computed value, not a literal secret).
+ */
+function isPlaceholderPhrase(value: string): boolean {
+  const interpolated = value.includes('${');
+  const parts = value
+    .replace(/\$\{[^}]*\}/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(/[\s_.:/@+-]+|(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])/)
+    .filter(Boolean);
+  let words = 0;
+  for (const part of parts) {
+    if (/^\d{1,6}$/.test(part)) continue;
+    if (!PLACEHOLDER_WORDS.has(part.toLowerCase())) return false;
+    words += 1;
+  }
+  return words > 0 || interpolated;
+}
+
 const PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/;
 const PRIVATE_KEY_END = /-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/;
 
@@ -95,7 +135,12 @@ export function redactLine(line: string, counter: RedactionCounter): string {
         return marker(kind);
       }
       const value = rest[group - 1];
-      if (typeof value !== 'string' || PLACEHOLDER.test(value) || value.startsWith('[REDACTED')) {
+      if (
+        typeof value !== 'string' ||
+        PLACEHOLDER.test(value) ||
+        isPlaceholderPhrase(value) ||
+        value.startsWith('[REDACTED')
+      ) {
         return match;
       }
       count(counter, kind);

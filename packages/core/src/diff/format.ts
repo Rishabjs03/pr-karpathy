@@ -61,12 +61,26 @@ export function formatFileContent(content: string): string {
 }
 
 /**
+ * Characters per token. In live runs against `claude-opus-5-5`, prompts billed about 2.4
+ * characters per token: one call with 479,384 characters cost 201,871 input tokens, about
+ * 1,300 of them per-call overhead. OpenAI tokenizers fit more characters in a token, so for
+ * them the estimate counts too many, which is the safe direction.
+ */
+const CHARS_PER_TOKEN = 2.35;
+
+/**
  * Estimates the number of tokens in a text.
  *
  * Providers count tokens differently, and the pipeline only needs an estimate to decide
- * whether a PR fits in one call. Code averages about 3.5 characters per token, so this errs on
- * the side of counting too many.
+ * whether a PR fits in one call. The estimate errs on the side of counting too many.
  */
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3.5);
+  return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
+
+/**
+ * Tokens that every model call costs beyond its prompt text: the output JSON schema that the
+ * provider adds for structured output, and message framing. Measured at about 1,300 tokens
+ * per call in live runs.
+ */
+export const REQUEST_OVERHEAD_TOKENS = 1_300;

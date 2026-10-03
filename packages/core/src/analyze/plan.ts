@@ -10,14 +10,19 @@
  *   (usually a generated or data file) makes the file "too-large".
  */
 import type { FileContents, PreparedChangeSet } from '../changeset';
-import { estimateTokens, formatFileContent, formatFileDiff } from '../diff/format';
+import {
+  estimateTokens,
+  formatFileContent,
+  formatFileDiff,
+  REQUEST_OVERHEAD_TOKENS,
+} from '../diff/format';
 import type { DiffFile, DiffHunk } from '../diff/types';
 import { buildUserPrompt } from '../prompts/user-message';
 
 export interface BudgetOptions {
   /** Most input tokens for a single call (system prompt included). */
   maxInputTokens: number;
-  /** Most input tokens for one batch call in batched mode. */
+  /** Most input tokens for one batch call in batched mode. Never more than `maxInputTokens`. */
   batchInputTokens: number;
   /** Include full file contents for context. */
   includeContents: boolean;
@@ -138,6 +143,7 @@ export function planAnalysis(
   options: BudgetOptions = DEFAULT_BUDGET,
 ): AnalysisPlan {
   const baseTokens =
+    REQUEST_OVERHEAD_TOKENS +
     systemTokens +
     estimateTokens(
       buildUserPrompt({
@@ -163,6 +169,7 @@ export function planAnalysis(
 
   // Fixed cost of every batch call: system prompt, PR metadata, and the list of all files.
   const overhead =
+    REQUEST_OVERHEAD_TOKENS +
     batchSystemTokens +
     estimateTokens(
       buildUserPrompt({
@@ -174,7 +181,8 @@ export function planAnalysis(
         otherFiles: prepared.files,
       }),
     );
-  const diffBudget = options.batchInputTokens - overhead;
+  // A batch call is a model call too, so it stays within the budget for one call.
+  const diffBudget = Math.min(options.batchInputTokens, options.maxInputTokens) - overhead;
 
   const batches: Batch[] = [];
   const tooLarge: DiffFile[] = [];

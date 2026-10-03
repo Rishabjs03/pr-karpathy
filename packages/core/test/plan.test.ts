@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BUDGET, planAnalysis, splitFileByHunks } from '../src/analyze/plan';
-import { describeFile, estimateTokens, formatFileDiff } from '../src/diff/format';
+import {
+  describeFile,
+  estimateTokens,
+  formatFileContent,
+  formatFileDiff,
+} from '../src/diff/format';
 import type { PreparedChangeSet } from '../src/changeset';
 import { parseUnifiedDiff } from '../src/diff/parse';
 import { fixtureDiff } from './helpers';
@@ -29,6 +34,12 @@ function prepared(
 const big = (lines: number) =>
   Array.from({ length: lines }, (_, i) => `const line${i} = ${i};`).join('\n');
 
+/** Estimated tokens of one call that sends every diff and no file contents. */
+function singleCallTokens(changeSet: PreparedChangeSet): number {
+  return planAnalysis(changeSet, 2000, 2000, { ...DEFAULT_BUDGET, includeContents: false })
+    .estimatedTokens;
+}
+
 describe('planAnalysis', () => {
   it('uses one call and includes new contents first, then old contents', () => {
     const plan = planAnalysis(
@@ -48,10 +59,12 @@ describe('planAnalysis', () => {
   });
 
   it('drops old contents before new contents when the budget is tight', () => {
-    const contents = { 'src/api/upload.ts': { base: big(400), head: big(400) } };
-    const plan = planAnalysis(prepared(contents), 2000, 2000, {
+    const changeSet = prepared({ 'src/api/upload.ts': { base: big(400), head: big(400) } });
+    // Room for one version of the file, not two.
+    const oneVersion = estimateTokens(formatFileContent(big(400)));
+    const plan = planAnalysis(changeSet, 2000, 2000, {
       ...DEFAULT_BUDGET,
-      maxInputTokens: 2000 + 1500 + 3500,
+      maxInputTokens: singleCallTokens(changeSet) + Math.round(oneVersion * 1.5),
     });
     expect(plan.mode).toBe('single');
     if (plan.mode !== 'single') return;
@@ -84,17 +97,19 @@ describe('planAnalysis', () => {
     expect(plan.mode === 'single' && plan.contents.size).toBe(0);
   });
 
-  it('switches to batches when the diff does not fit in one call', () => {
-    const plan = planAnalysis(prepared({}), 2000, 2000, {
+  it('switches to batches that each fit in the budget for one call', () => {
+    const changeSet = prepared({});
+    const plan = planAnalysis(changeSet, 2000, 2000, {
       ...DEFAULT_BUDGET,
-      maxInputTokens: 2100,
-      batchInputTokens: 4000,
+      maxInputTokens: singleCallTokens(changeSet) - 1,
+      // Both diffs fit in this, but a batch call must not exceed maxInputTokens.
+      batchInputTokens: 60_000,
     });
     expect(plan.mode).toBe('batched');
     if (plan.mode !== 'batched') return;
-    expect(plan.batches.flatMap((batch) => batch.files.map((file) => file.path)).sort()).toEqual([
-      'src/api/server.ts',
-      'src/api/upload.ts',
+    expect(plan.batches.map((batch) => batch.files.map((file) => file.path))).toEqual([
+      ['src/api/server.ts'],
+      ['src/api/upload.ts'],
     ]);
     expect(plan.tooLarge).toEqual([]);
   });
@@ -102,10 +117,9 @@ describe('planAnalysis', () => {
   it('marks files whose diff alone exceeds the batch budget as too large', () => {
     const plan = planAnalysis(prepared({}), 2000, 2000, {
       ...DEFAULT_BUDGET,
-      maxInputTokens: 2100,
-      batchInputTokens: 2300,
+      maxInputTokens: 4000,
     });
-    expect(plan.tooLarge.map((file) => file.path)).toContain('src/api/upload.ts');
+    expect(plan.tooLarge.map((file) => file.path)).toEqual(['src/api/upload.ts']);
   });
 });
 

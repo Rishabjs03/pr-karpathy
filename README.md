@@ -216,7 +216,8 @@ instead of "this logic". The rules are in
 - Likely secrets are redacted before anything is sent: API keys and tokens in known formats
   (Anthropic, OpenAI, GitHub, AWS, Google, Slack, Stripe, npm, and more), private key blocks,
   passwords in URLs, quoted values assigned to names like `password` or `api_key`, and every
-  value in `.env` files. The count is printed and shown in the page footer. Redaction is a
+  value in `.env` files. Test fixtures such as `token: 'valid-token'` or `apiKey: 'secret123'`
+  are left alone. The count is printed and shown in the page footer. Redaction is a
   best-effort filter, not a guarantee.
 - Skipped files (lockfiles, binaries, generated files) are never read or sent.
 - Tokens and API keys are never logged. Raw model output is printed only with `--verbose`.
